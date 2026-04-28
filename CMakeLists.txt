@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.22)
 set(CXX_DISABLE_WERROR 1)
 set(CMAKE_CXX_STANDARD 11)
 
-set(PROJECT_NAME NewRLQPController)
-set(PROJECT_DESCRIPTION "NewRLQPController")
+set(PROJECT_NAME HRP5pRLQPController)
+set(PROJECT_DESCRIPTION "HRP5pRLQPController")
 set(PROJECT_URL "")
 
 project(
@@ -24,7 +24,7 @@ add_subdirectory(src)
 #   add_subdirectory(tests)
 # endif()
 
-configure_file(etc/NewRLQPController.in.yaml
-               "${CMAKE_CURRENT_BINARY_DIR}/etc/NewRLQPController.yaml")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/etc/NewRLQPController.yaml"
+configure_file(etc/HRP5pRLQPController.in.yaml
+               "${CMAKE_CURRENT_BINARY_DIR}/etc/HRP5pRLQPController.yaml")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/etc/HRP5pRLQPController.yaml"
         DESTINATION "${MC_CONTROLLER_RUNTIME_INSTALL_PREFIX}/etc")

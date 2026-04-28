@@ -38,9 +38,9 @@ ObserverPipelines:
 states: {}
 # Transitions map
 transitions:
-- [NewRLQPController_Initial, OK, NewRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, OK, HRP5pRLQPController_Initial, Strict]
 # Initial state
-init: NewRLQPController_Initial
+init: HRP5pRLQPController_Initial
 
 # RL policy configuration parameters
 policy_path: ["policyName1.onnx", "policyName2.onnx"]  # Path to the RL policy file(s) 

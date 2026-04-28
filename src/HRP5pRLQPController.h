@@ -9,9 +9,9 @@
 #include "utils.h"
 
 
-struct NewRLQPController_DLLAPI NewRLQPController : public mc_control::fsm::Controller
+struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::Controller
 {
-  NewRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config);
+  HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config);
 
   bool run() override;
   void reset(const mc_control::ControllerResetData & reset_data) override;

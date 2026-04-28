@@ -2,11 +2,11 @@
 #include <Eigen/src/Core/Matrix.h>
 #include <mc_rtc/logging.h>
 
-#include "NewRLQPController.h"
+#include "HRP5pRLQPController.h"
 
 void utils::start_rl_state(mc_control::fsm::Controller & ctl_, std::string state_name)
 {
-  auto & ctl = static_cast<NewRLQPController&>(ctl_);
+  auto & ctl = static_cast<HRP5pRLQPController&>(ctl_);
   state_name_ = state_name;
   mc_rtc::log::info("{} state started", state_name);
 
@@ -19,7 +19,7 @@ void utils::start_rl_state(mc_control::fsm::Controller & ctl_, std::string state
   }
 
   ctl.gui()->addElement(
-    {"NewRLQPController", state_name},
+    {"HRP5pRLQPController", state_name},
     mc_rtc::gui::Label("Policy Loaded", [&ctl]() { 
       return ctl.rlPolicy->isLoaded() ? "Yes" : "No"; 
     }),
@@ -36,7 +36,7 @@ void utils::start_rl_state(mc_control::fsm::Controller & ctl_, std::string state
 
 void utils::run_rl_state(mc_control::fsm::Controller & ctl_)
 {
-  auto & ctl = static_cast<NewRLQPController&>(ctl_);
+  auto & ctl = static_cast<HRP5pRLQPController&>(ctl_);
   try
   {
     syncTime_ += ctl.timeStep;
@@ -58,12 +58,12 @@ void utils::run_rl_state(mc_control::fsm::Controller & ctl_)
 
 void utils::teardown_rl_state(mc_control::fsm::Controller & ctl_)
 {
-  ctl_.gui()->removeCategory({"NewRLQPController", state_name_});
+  ctl_.gui()->removeCategory({"HRP5pRLQPController", state_name_});
 }
 
 Eigen::VectorXd utils::getCurrentObservation(mc_control::fsm::Controller & ctl_)
 {
-  auto & ctl = static_cast<NewRLQPController&>(ctl_);
+  auto & ctl = static_cast<HRP5pRLQPController&>(ctl_);
   Eigen::VectorXd obs(ctl.rlPolicy->getObservationSize());
   obs = Eigen::VectorXd::Zero(ctl.rlPolicy->getObservationSize());
 

@@ -1,8 +1,8 @@
-#include "NewRLQPController.h"
+#include "HRP5pRLQPController.h"
 
 #include <RBDyn/MultiBodyConfig.h>
 
-NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config)
+HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config)
 : mc_control::fsm::Controller(rm, dt, config, Backend::TVM)
 {
   config_ = config;
@@ -26,10 +26,10 @@ NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, con
 
   addGui();
   addLog();
-  mc_rtc::log::success("NewRLQPController init done");
+  mc_rtc::log::success("HRP5pRLQPController init done");
 }
 
-bool NewRLQPController::run()
+bool HRP5pRLQPController::run()
 {
   bool run = manageModeSwitching();
   if(byPassQPControl()) // Run RL without taking the QP into account
@@ -39,23 +39,23 @@ bool NewRLQPController::run()
   return run; // Return false if QP fails
 }
 
-void NewRLQPController::reset(const mc_control::ControllerResetData & reset_data)
+void HRP5pRLQPController::reset(const mc_control::ControllerResetData & reset_data)
 {
   mc_control::fsm::Controller::reset(reset_data);
 }
 
-void NewRLQPController::initializeRobot()
+void HRP5pRLQPController::initializeRobot()
 {
   useQP_ = config_("policies")[currentPolicyIndex]("use_QP", true);
   isTorqueControl_ = config_("policies")[currentPolicyIndex]("is_torque_control", false);
   if(isTorqueControl_)
   {
-    mc_rtc::log::info("[NewRLQPController] Using Torque Control mode");
+    mc_rtc::log::info("[HRP5pRLQPController] Using Torque Control mode");
     datastore().make<std::string>("ControlMode", "Torque");
   }
   else
   {
-    mc_rtc::log::info("[NewRLQPController] Using Position Control mode");
+    mc_rtc::log::info("[HRP5pRLQPController] Using Position Control mode");
     datastore().make<std::string>("ControlMode", "Position");
   }
 
@@ -91,7 +91,7 @@ void NewRLQPController::initializeRobot()
       if(j.type() == rbd::Joint::Type::Rev)
       {
         jointNames_.emplace_back(joint_name);  
-        mc_rtc::log::info("[NewRLQPController] Found joint: {}", joint_name);
+        mc_rtc::log::info("[HRP5pRLQPController] Found joint: {}", joint_name);
         if (const auto &t = posture[robot().jointIndexByName(joint_name)]; !t.empty()) {
             kpBase_[i] = kp_map.at(joint_name);
             kdBase_[i] = kd_map.at(joint_name);
@@ -108,7 +108,7 @@ void NewRLQPController::initializeRobot()
   torqueJointTask->setDamping(kd_);
 }
 
-void NewRLQPController::initializeRLPolicy()
+void HRP5pRLQPController::initializeRLPolicy()
 {
   // load policy specific configuration
   policyPaths_ = config_("policy_path", std::vector<std::string>{"walking_better_h1.onnx"});
@@ -132,7 +132,7 @@ void NewRLQPController::initializeRLPolicy()
   currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
 }
 
-void NewRLQPController::switchPolicy(int policyIndex)
+void HRP5pRLQPController::switchPolicy(int policyIndex)
 {
   if(policyIndex < 0 || policyIndex >= static_cast<int>(policyPaths_.size())) {
     mc_rtc::log::error("Invalid policy index: {}", policyIndex);
@@ -175,12 +175,12 @@ void NewRLQPController::switchPolicy(int policyIndex)
   torqueJointTask->setDamping(kd_);
 }
 
-bool NewRLQPController::byPassQPControl()
+bool HRP5pRLQPController::byPassQPControl()
 {
   if(useQP_) return false; // QP is not bypassed, do nothing
   if(!isTorqueControl_)
   {
-    mc_rtc::log::warning("[NewRLQPController] QP can't be bypassed in position control mode. Please enable torque control to bypass QP.");
+    mc_rtc::log::warning("[HRP5pRLQPController] QP can't be bypassed in position control mode. Please enable torque control to bypass QP.");
     return false;
   }
 
@@ -207,34 +207,34 @@ bool NewRLQPController::byPassQPControl()
   return true;
 }
 
-void NewRLQPController::addLog()
+void HRP5pRLQPController::addLog()
 {
   // Robot State variables
-  logger().addLogEntry("NewRLQPController_kp_base", [this]() { return kpBase_; });
-  logger().addLogEntry("NewRLQPController_kd_base", [this]() { return kdBase_; });
-  logger().addLogEntry("NewRLQPController_kp_current", [this]() { return kp_; });
-  logger().addLogEntry("NewRLQPController_kd_current", [this]() { return kd_; });
-  logger().addLogEntry("NewRLQPController_pd_gains_ratio", [this]() { return pdGainsRatio_; });
+  logger().addLogEntry("HRP5pRLQPController_kp_base", [this]() { return kpBase_; });
+  logger().addLogEntry("HRP5pRLQPController_kd_base", [this]() { return kdBase_; });
+  logger().addLogEntry("HRP5pRLQPController_kp_current", [this]() { return kp_; });
+  logger().addLogEntry("HRP5pRLQPController_kd_current", [this]() { return kd_; });
+  logger().addLogEntry("HRP5pRLQPController_pd_gains_ratio", [this]() { return pdGainsRatio_; });
 
   // RL variables
-  logger().addLogEntry("NewRLQPController_RL_q", [this]() { return q_rl; });
-  logger().addLogEntry("NewRLQPController_RL_qZero", [this]() { return q_zero; });
-  logger().addLogEntry("NewRLQPController_RL_currentObservation", [this]() { return currentObservation; });
-  logger().addLogEntry("NewRLQPController_RL_currentAction", [this]() { return currentAction; });
+  logger().addLogEntry("HRP5pRLQPController_RL_q", [this]() { return q_rl; });
+  logger().addLogEntry("HRP5pRLQPController_RL_qZero", [this]() { return q_zero; });
+  logger().addLogEntry("HRP5pRLQPController_RL_currentObservation", [this]() { return currentObservation; });
+  logger().addLogEntry("HRP5pRLQPController_RL_currentAction", [this]() { return currentAction; });
   
   // Controller state variables
-  logger().addLogEntry("NewRLQPController_useQP", [this]() { return useQP_; });
-  logger().addLogEntry("NewRLQPController_isTorqueControl", [this]() { return isTorqueControl_; });
+  logger().addLogEntry("HRP5pRLQPController_useQP", [this]() { return useQP_; });
+  logger().addLogEntry("HRP5pRLQPController_isTorqueControl", [this]() { return isTorqueControl_; });
 
   // Log current policy (combined index and path)
-  logger().addLogEntry("NewRLQPController_currentPolicy", [this]() { 
+  logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { 
     return std::to_string(currentPolicyIndex) + ": " + policyPaths_[currentPolicyIndex]; 
   });
 }
 
-void NewRLQPController::addGui()
+void HRP5pRLQPController::addGui()
 {
-  gui()->addElement({"NewRLQPController", "Policy"},
+  gui()->addElement({"HRP5pRLQPController", "Policy"},
   mc_rtc::gui::Label("Current policy", [this]() -> const std::string & 
     { 
       return policyPaths_[currentPolicyIndex]; 
@@ -266,7 +266,7 @@ void NewRLQPController::addGui()
   );
 
   // Add PD gains ratio slider
-  gui()->addElement({"NewRLQPController", "PD Gains"},
+  gui()->addElement({"HRP5pRLQPController", "PD Gains"},
     mc_rtc::gui::NumberSlider(
       "PD Gains Ratio", [this]() { return pdGainsRatio_; },
       [this](double v) { 
@@ -301,7 +301,7 @@ void NewRLQPController::addGui()
     );
 }
 
-void NewRLQPController::configRL()
+void HRP5pRLQPController::configRL()
 {
   mc_rtc::log::info("Loading RL policy [{}]: {}", currentPolicyIndex, policyPaths_[currentPolicyIndex]);
   try {
@@ -329,7 +329,7 @@ void NewRLQPController::configRL()
   }
 }
 
-bool NewRLQPController::manageModeSwitching()
+bool HRP5pRLQPController::manageModeSwitching()
 {
   if(controlModeChanged_)
   {

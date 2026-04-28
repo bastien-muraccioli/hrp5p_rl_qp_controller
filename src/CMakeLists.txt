@@ -11,20 +11,20 @@ find_library(ONNXRUNTIME_LIB
 )
 
 set(controller_SRC 
-  NewRLQPController.cpp
+  HRP5pRLQPController.cpp
   RLPolicyInterface.cpp
   utils.cpp
 )
 
 set(controller_HDR 
-  NewRLQPController.h
+  HRP5pRLQPController.h
   RLPolicyInterface.h
   utils.h
 )
 
 add_library(${PROJECT_NAME} SHARED ${controller_SRC} ${controller_HDR})
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS
-                                                 "-DNewRLQPController_EXPORTS")
+                                                 "-DHRP5pRLQPController_EXPORTS")
 target_link_libraries(${PROJECT_NAME} PUBLIC mc_rtc::mc_control_fsm)
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC
