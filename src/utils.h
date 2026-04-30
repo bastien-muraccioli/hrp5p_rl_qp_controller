@@ -14,5 +14,4 @@ struct utils
     private:
         std::string state_name_;
         double syncTime_;
-        double syncPhase_ = 0.0;
 };

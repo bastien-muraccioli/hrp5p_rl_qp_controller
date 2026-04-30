@@ -27,12 +27,23 @@ collisions:
   useMinimal: true
 
 ObserverPipelines:
-- name: Pipeline
+- name: MainPipeline
   observers:
     # Add an encoder observer to read joint velocities (Required for closed loop control)
     - type: Encoder
       config:
           velocity: encoderVelocities
+    - type: BodySensor                    
+      update: true                        
+      gui: false                           
+      config:                          
+        bodySensor: FloatingBase
+    # - type:
+    # - type: Attitude
+    # - type: KinematicInertial
+    #   config:
+    #     anchorFrame:
+    #       maxAnchorFrameDiscontinuity: 0.05 # [m]
 
 # Implement some additional text states
 states: {}
@@ -43,50 +54,690 @@ transitions:
 init: HRP5pRLQPController_Initial
 
 # RL policy configuration parameters
-policy_path: ["policyName1.onnx", "policyName2.onnx"]  # Path to the RL policy file(s) 
-default_policy_index: 0 # Index of the default policy to use
+policy_path: ["1.onnx", "2.onnx"]  # Path to the RL policy file(s) 
+default_policy_index: 1 # Index of the default policy to use
 policies:
   # index 0 : policyName1
   - is_torque_control: true
-    use_QP: true
-    action_scale: 1.0
-    policy_step_size: 0.01 # Policy step size in seconds
-    physics_step_size: 0.001 # Physics step size in seconds
+    use_QP: false
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
     pd_gains_ratio: 1.0
-    kp:
-        joint_name1: gain value e.g 100.0
-        joint_name2: gain value e.g 100.0
-        ...
-        joint_nameN: gain value e.g 100.0
-    kd:
-        joint_name1: gain value e.g 100.0
-        joint_name2: gain value e.g 100.0
-        ...
-        joint_nameN: gain value e.g 100.0
+
+    # Action scaling factors for each joint, used to scale the policy output to the appropriate range for the robot's joints. 
+    # Action scaling must respect the same order as the robot's joint order used in the RL framework.
+    # Action scale must be set to 0 for joints that are not controlled by the policy, to avoid unintended movements.
+    # Nb: q0 is used to define the joint order in mc_rtc.
+    action_scale:  
+      # Right Leg (lower × 0.05)  
+      RCY: 0.01250 # 200/800  * 0.05  
+      RCR: 0.03125 # 500/800  * 0.05  
+      RCP: 0.03125 # 500/800  * 0.05  
+      RKP: 0.07500 # 1200/800 * 0.05  
+      RAP: 0.06250 # 250/200  * 0.05  ← upper_scale  
+      RAR: 0.00150 # 200/200  * 0.002 ← upper_scale  
+      
+      # Left Leg (lower × 0.05)  
+      LCY: 0.01250 # 200/800  * 0.05  
+      LCR: 0.03125 # 500/800  * 0.05  
+      LCP: 0.03125 # 500/800  * 0.05  
+      LKP: 0.07500 # 1200/800 * 0.05  
+      LAP: 0.06250 # 250/200  * 0.05  ← lower_scale  
+      LAR: 0.00150 # 200/200  * 0.002 ← upper_scale  
+      
+      # Waist (lower × 0.05)  
+      WP: 0.05625 # 900/800 * 0.05  
+      WR: 0.05625 # 900/800 * 0.05  
+      WY: 0.01563 # 250/800 * 0.05  
+      
+      # Head (upper × 0.002)  
+      HY: 0.00045 # 45/200  * 0.002   
+      HP: 0.00045 # 45/200  * 0.002 
+      
+      # Right Arm (upper × 0.002)  
+      RSC: 0.00200 # 200/200 * 0.002  
+      RSP: 0.00400 # 400/200 * 0.002  
+      RSR: 0.00350 # 350/200 * 0.002  
+      RSY: 0.00200 # 200/200 * 0.002  
+      REP: 0.00400 # 400/200 * 0.002  
+      RWRY: 0.00300 # 300/200 * 0.002  
+      RWRR: 0.00300 # 300/200 * 0.002  
+      RWRP: 0.00120 # 120/200 * 0.002
+
+      # Right Hand (Not commended by the policy)  
+      RHDY: 0.0  
+      RIMP: 0.0  
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: 0.0  
+      RMPIP: 0.0  
+      RMDIP: 0.0  
+      RTMP: 0.0  
+      RTPIP: 0.0  
+      RTDIP: 0.0   
+      
+      # Left Arm (upper × 0.002)  
+      LSC: 0.00200 # 200/200 * 0.002  
+      LSP: 0.00400 # 400/200 * 0.002  
+      LSR: 0.00350 # 350/200 * 0.002  
+      LSY: 0.00200 # 200/200 * 0.002  
+      LEP: 0.00400 # 400/200 * 0.002  
+      LWRY: 0.00300 # 300/200 * 0.002  
+      LWRR: 0.00300 # 300/200 * 0.002  
+      LWRP: 0.00120 # 120/200 * 0.002
+
+      # Left Hand (Not commended by the policy)
+      LHDY: 0.0  
+      LIMP: 0.0  
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: 0.0  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+      LTMP: 0.0  
+      LTPIP: 0.0  
+      LTDIP: 0.0 
+    
+    kp:  
+      # Right Leg  
+      RCY: 800.0  
+      RCR: 800.0  
+      RCP: 800.0  
+      RKP: 800.0  
+      RAP: 200.0  
+      RAR: 200.0  
+      
+      # Left Leg  
+      LCY: 800.0  
+      LCR: 800.0  
+      LCP: 800.0  
+      LKP: 800.0  
+      LAP: 200.0  
+      LAR: 200.0  
+      
+      # Waist  
+      WP: 800.0  
+      WR: 800.0  
+      WY: 800.0  
+      
+      # Head    
+      HY: 200.0 
+      HP: 200.0 
+      
+      # Right Arm  
+      RSC: 200.0  
+      RSP: 200.0  
+      RSR: 200.0  
+      RSY: 200.0  
+      REP: 200.0  
+      RWRY: 200.0  
+      RWRR: 200.0  
+      RWRP: 200.0
+
+      # Right Hand  
+      RHDY: 100.0  
+      RIMP: 100.0  
+      RIPIP: 100.0  
+      RIDIP: 100.0  
+      RMMP: 100.0  
+      RMPIP: 100.0  
+      RMDIP: 100.0  
+      RTMP: 100.0  
+      RTPIP: 100.0  
+      RTDIP: 100.0    
+      
+      # Left Arm  
+      LSC: 200.0  
+      LSP: 200.0  
+      LSR: 200.0  
+      LSY: 200.0  
+      LEP: 200.0  
+      LWRY: 200.0  
+      LWRR: 200.0  
+      LWRP: 200.0
+
+      # Left Hand  
+      LHDY: 100.0  
+      LIMP: 100.0  
+      LIPIP: 100.0  
+      LIDIP: 100.0  
+      LMMP: 100.0  
+      LMPIP: 100.0  
+      LMDIP: 100.0  
+      LTMP: 100.0  
+      LTPIP: 100.0  
+      LTDIP: 100.0     
+            
+    kd:  
+      # Right Leg  
+      RCY: 10.0  
+      RCR: 10.0  
+      RCP: 10.0  
+      RKP: 10.0  
+      RAP: 5.0  
+      RAR: 5.0  
+      
+      # Left Leg  
+      LCY: 10.0  
+      LCR: 10.0  
+      LCP: 10.0  
+      LKP: 10.0  
+      LAP: 5.0  
+      LAR: 5.0  
+      
+      # Waist  
+      WP: 10.0  
+      WR: 10.0  
+      WY: 10.0  
+      
+      # Head  
+      HY: 5.0  
+      HP: 5.0  
+      
+      # Right Arm  
+      RSC: 5.0  
+      RSP: 5.0  
+      RSR: 5.0  
+      RSY: 5.0  
+      REP: 5.0  
+      RWRY: 5.0  
+      RWRR: 5.0  
+      RWRP: 5.0
+
+      # Right Hand  
+      RHDY: 5.0  
+      RIMP: 5.0  
+      RIPIP: 5.0  
+      RIDIP: 5.0  
+      RMMP: 5.0  
+      RMPIP: 5.0  
+      RMDIP: 5.0  
+      RTMP: 5.0  
+      RTPIP: 5.0  
+      RTDIP: 5.0    
+      
+      # Left Arm  
+      LSC: 5.0  
+      LSP: 5.0  
+      LSR: 5.0  
+      LSY: 5.0  
+      LEP: 5.0  
+      LWRY: 5.0  
+      LWRR: 5.0  
+      LWRP: 5.0
+
+      # Left Hand  
+      LHDY: 5.0  
+      LIMP: 5.0  
+      LIPIP: 5.0  
+      LIDIP: 5.0  
+      LMMP: 5.0  
+      LMPIP: 5.0  
+      LMDIP: 5.0  
+      LTMP: 5.0  
+      LTPIP: 5.0  
+      LTDIP: 5.0
+
+    # q0 must be defined in the same order as the robot's joint order, and should be in radians
+    # q0 is used to compute q_rl = q0 + action_scaled, which is the target position for the PD controller
+    # q0 is also used to define the joint names and their order, it must contain all the joints of the robot and respect the mc_rtc joint naming and order convention.
     q0:
-      joint_name1: joint pos value in rad e.g 0.0
-      joint_name2: joint pos value in rad e.g 0.0
-      ...
-      joint_nameN: joint pos value in rad e.g 0.0
-  # index 1 : policyName2
+      # Right Leg  
+      RCY: 0.0  
+      RCR: 0.0  
+      RCP: -0.46862 # -26.87°  
+      RKP: 0.87266 # 50.00°  
+      RAP: -0.40377 # -23.13°  
+      RAR: 0.0  
+      
+      # Left Leg  
+      LCY: 0.0  
+      LCR: 0.0  
+      LCP: -0.46862 # -26.87°  
+      LKP: 0.87266 # 50.00°  
+      LAP: -0.40377 # -23.13°  
+      LAR: 0.0  
+      
+      # Waist  
+      WP: 0.0  
+      WR: 0.0  
+      WY: 0.0  
+      
+      # Head  
+      HY: 0.0   
+      HP: 0.0 
+      
+      # Right Arm  
+      RSC: 0.0  
+      RSP: 1.04720 # 60.0°  
+      RSR: -0.34907 # -20.0°  
+      RSY: -0.08727 # -5.0°  
+      REP: -1.83260 # -105.0°  
+      RWRY: 0.0  
+      RWRR: -0.69813 # -40.0°  
+      RWRP: 0.0  
+      
+      # Right Hand  
+      RHDY: 0.0
+      
+      RTMP: 1.05592 # 60.5°
+      RTPIP: 0.0
+      RTDIP: 0.0
+
+      RIMP: -1.05592 # -60.5°  
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: -1.05592 # -60.5°  
+      RMPIP: 0.0  
+      RMDIP: 0.0
+      
+      # Left Arm  
+      LSC: 0.0  
+      LSP: 1.04720 # 60.0°  
+      LSR: 0.34907 # 20.0°  
+      LSY: 0.08727 # 5.0°  
+      LEP: -1.83260 # -105.0°  
+      LWRY: 0.0  
+      LWRR: 0.69813 # 40.0°  
+      LWRP: 0.0  
+      
+      # Left Hand  
+      LHDY: 0.0
+
+      LTMP: -1.05592 # -60.5°  
+      LTPIP: 0.0  
+      LTDIP: 0.0
+
+      LIMP: 1.05592 # 60.5°  
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: 1.05592 # 60.5°  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"
+
+  # index 0 : policyName1
   - is_torque_control: true
-    use_QP: true
-    action_scale: 1.0
-    policy_step_size: 0.01 # Policy step size in seconds
-    physics_step_size: 0.001 # Physics step size in seconds
+    use_QP: false
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
     pd_gains_ratio: 1.0
-    kp:
-        joint_name1: gain value e.g 100.0
-        joint_name2: gain value e.g 100.0
-        ...
-        joint_nameN: gain value e.g 100.0
-    kd:
-        joint_name1: gain value e.g 100.0
-        joint_name2: gain value e.g 100.0
-        ...
-        joint_nameN: gain value e.g 100.0
+
+    action_scale:
+      RCY: 0.5113
+      RCR: 0.4439
+      RCP: 0.4439
+      RKP: 0.2876
+      RAP: 0.4351
+      RAR: 0.0100
+
+      # Left Leg
+      LCY: 0.5113
+      LCR: 0.4439
+      LCP: 0.4439
+      LKP: 0.2876
+      LAP: 0.4351
+      LAR: 0.0100
+
+      # Waist
+      WP: 0.0065
+      WR: 0.0320
+      WY: 0.0018
+
+      # Head
+      HY: 0.0107
+      HP: 0.0105
+
+      # Right Arm
+      RSC: 0.0068
+      RSP: 0.0058
+      RSR: 0.0071
+      RSY: 0.0102
+      REP: 0.0069
+      RWRY: 0.0103
+      RWRR: 0.0103
+      RWRP: 0.0041
+
+      # Right Hand (Not commended by the policy)  
+      RHDY: 0.0  
+      RIMP: 0.0  
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: 0.0  
+      RMPIP: 0.0  
+      RMDIP: 0.0  
+      RTMP: 0.0  
+      RTPIP: 0.0  
+      RTDIP: 0.0   
+      
+      # Left Arm
+      LSC: 0.0068
+      LSP: 0.0058
+      LSR: 0.0071
+      LSY: 0.0102
+      LEP: 0.0069
+      LWRY: 0.0103
+      LWRR: 0.0103
+      LWRP: 0.0041
+
+      # Left Hand (Not commended by the policy)
+      LHDY: 0.0  
+      LIMP: 0.0  
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: 0.0  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+      LTMP: 0.0  
+      LTPIP: 0.0  
+      LTDIP: 0.0 
+    
+    kp:  
+      # Right Leg
+      RCY: 39.1138
+      RCR: 112.6436
+      RCP: 112.6436
+      RKP: 417.2479
+      RAP: 57.4529
+      RAR: 39.9007
+
+      # Left Leg
+      LCY: 39.1138
+      LCR: 112.6436
+      LCP: 112.6436
+      LKP: 417.2479
+      LAP: 57.4529
+      LAR: 39.9007
+
+      # Waist
+      WP: 278.1653
+      WR: 278.1653
+      WY: 56.3218
+
+      # Head
+      HY: 8.4202
+      HP: 8.5888
+
+      # Right Arm
+      RSC: 58.5189
+      RSP: 139.0826
+      RSR: 98.5265
+      RSY: 39.1138
+      REP: 115.5438
+      RWRY: 58.5189
+      RWRR: 58.5189
+      RWRP: 58.5189
+
+      # Right Hand  
+      RHDY: 50.0  
+      RIMP: 50.0  
+      RIPIP: 50.0  
+      RIDIP: 50.0  
+      RMMP: 50.0  
+      RMPIP: 50.0  
+      RMDIP: 50.0  
+      RTMP: 50.0  
+      RTPIP: 50.0  
+      RTDIP: 50.0 
+
+      # Left Arm
+      LSC: 58.5189
+      LSP: 139.0826
+      LSR: 98.5265
+      LSY: 39.1138
+      LEP: 115.5438
+      LWRY: 58.5189
+      LWRR: 58.5189
+      LWRP: 58.5189
+
+      # Left Hand  
+      LHDY: 50.0  
+      LIMP: 50.0  
+      LIPIP: 50.0  
+      LIDIP: 50.0  
+      LMMP: 50.0  
+      LMPIP: 50.0  
+      LMDIP: 50.0  
+      LTMP: 50.0  
+      LTPIP: 50.0  
+      LTDIP: 50.0      
+            
+    kd:  
+      # Right Leg
+      RCY: 6.2252
+      RCR: 17.9278
+      RCP: 17.9278
+      RKP: 66.4071
+      RAP: 9.1439
+      RAR: 6.3504
+
+      # Left Leg
+      LCY: 6.2252
+      LCR: 17.9278
+      LCP: 17.9278
+      LKP: 66.4071
+      LAP: 9.1439
+      LAR: 6.3504
+
+      # Waist
+      WP: 44.2714
+      WR: 44.2714
+      WY: 8.9639
+
+      # Head
+      HY: 1.3401
+      HP: 1.3670
+
+      # Right Arm
+      RSC: 9.3136
+      RSP: 22.1357
+      RSR: 15.6810
+      RSY: 6.2252
+      REP: 18.3894
+      RWRY: 9.3136
+      RWRR: 9.3136
+      RWRP: 9.3136
+
+      # Right Hand  
+      RHDY: 5.0  
+      RIMP: 5.0  
+      RIPIP: 5.0  
+      RIDIP: 5.0  
+      RMMP: 5.0  
+      RMPIP: 5.0  
+      RMDIP: 5.0  
+      RTMP: 5.0  
+      RTPIP: 5.0  
+      RTDIP: 5.0  
+
+      # Left Arm
+      LSC: 9.3136
+      LSP: 22.1357
+      LSR: 15.6810
+      LSY: 6.2252
+      LEP: 18.3894
+      LWRY: 9.3136
+      LWRR: 9.3136
+      LWRP: 9.3136
+
+      # Left Hand  
+      LHDY: 5.0  
+      LIMP: 5.0  
+      LIPIP: 5.0  
+      LIDIP: 5.0  
+      LMMP: 5.0  
+      LMPIP: 5.0  
+      LMDIP: 5.0  
+      LTMP: 5.0  
+      LTPIP: 5.0  
+      LTDIP: 5.0
+
+    # q0 must be defined in the same order as the robot's joint order, and should be in radians
+    # q0 is used to compute q_rl = q0 + action_scaled, which is the target position for the PD controller
+    # q0 is also used to define the joint names and their order, it must contain all the joints of the robot and respect the mc_rtc joint naming and order convention.
     q0:
-        joint_name1: joint pos value in rad e.g 0.0
-        joint_name2: joint pos value in rad e.g 0.0
-        ...
-        joint_nameN: joint pos value in rad e.g 0.0
+      # Right Leg  
+      RCY: 0.0  
+      RCR: 0.0  
+      RCP: -0.46862 # -26.87°  
+      RKP: 0.87266 # 50.00°  
+      RAP: -0.40377 # -23.13°  
+      RAR: 0.0  
+      
+      # Left Leg  
+      LCY: 0.0  
+      LCR: 0.0  
+      LCP: -0.46862 # -26.87°  
+      LKP: 0.87266 # 50.00°  
+      LAP: -0.40377 # -23.13°  
+      LAR: 0.0  
+      
+      # Waist  
+      WP: 0.0  
+      WR: 0.0  
+      WY: 0.0  
+      
+      # Head  
+      HY: 0.0   
+      HP: 0.0 
+      
+      # Right Arm  
+      RSC: 0.0  
+      RSP: 1.04720 # 60.0°  
+      RSR: -0.34907 # -20.0°  
+      RSY: -0.08727 # -5.0°  
+      REP: -1.83260 # -105.0°  
+      RWRY: 0.0  
+      RWRR: -0.69813 # -40.0°  
+      RWRP: 0.0  
+      
+      # Right Hand  
+      RHDY: 0.0
+      
+      RTMP: 1.05592 # 60.5°
+      RTPIP: 0.0
+      RTDIP: 0.0
+
+      RIMP: -1.05592 # -60.5°  
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: -1.05592 # -60.5°  
+      RMPIP: 0.0  
+      RMDIP: 0.0
+      
+      # Left Arm  
+      LSC: 0.0  
+      LSP: 1.04720 # 60.0°  
+      LSR: 0.34907 # 20.0°  
+      LSY: 0.08727 # 5.0°  
+      LEP: -1.83260 # -105.0°  
+      LWRY: 0.0  
+      LWRR: 0.69813 # 40.0°  
+      LWRP: 0.0  
+      
+      # Left Hand  
+      LHDY: 0.0
+
+      LTMP: -1.05592 # -60.5°  
+      LTPIP: 0.0  
+      LTDIP: 0.0
+
+      LIMP: 1.05592 # 60.5°  
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: 1.05592 # 60.5°  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"

@@ -7,6 +7,9 @@
 
 #include "RLPolicyInterface.h"
 #include "utils.h"
+#include <Eigen/src/Core/Matrix.h>
+#include <string>
+#include <vector>
 
 
 struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::Controller
@@ -20,26 +23,34 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
   
   int dofNumber = 0;
+  std::vector<std::string> jointNames;
 
   // Public RL related variables
   Eigen::VectorXd q_rl;
   Eigen::VectorXd q_zero;                      // Reference joint positions
 
   Eigen::VectorXd currentObservation;
-  Eigen::VectorXd currentAction;
+  Eigen::VectorXd currentAction; // Raw output from the policy
+  Eigen::VectorXd currentActionScaled; // Scaled action after applying actionScale, share the same size as q_rl, for the joints that are not controlled by the policy the value is 0 in currentActionScaled.
 
-  double actionScale;
+  Eigen::VectorXd actionScale;
   double policyStepSize;
+  std::vector<std::string> refJointOrder;
+  std::vector<int> actionToDofMap; // size = actionSize
+  // std::vector<int> rlFrameworkToMcRtcJointMap; // size = dofNumber
+  std::vector<int> mcRtcToRLFrameworkJointMap; // size = dofNumber
 
   size_t currentPolicyIndex = 0;
   std::unique_ptr<RLPolicyInterface> rlPolicy;
   utils utilsClass; // Utility functions for RL controller
 
-  // observation data commented examples - Policy specific
-  // Eigen::Vector3d baseAngVel; // Angular velocity of the base
-  // Eigen::Vector3d rpy; // Roll, Pitch, Yaw angles of the base
-  // Eigen::VectorXd jointPos, jointVel, jointAction; // Joint position, velocity and action
-  // Eigen::Vector3d velCmdRL;                        // Command vector [vx, vy, yaw_rate]
+  // observation
+  static constexpr int HISTORY_SIZE = 3; // Number of past time steps to include in the observation
+  std::array<Eigen::Vector3d, HISTORY_SIZE> linVel, angVel, projectedGravity;
+  std::array<Eigen::VectorXd, HISTORY_SIZE> jointPos, jointVel, jointAction;
+  std::array<Eigen::Vector3d, HISTORY_SIZE> velCmd; // Command vector [vx, vy, yaw_rate]
+
+  Eigen::Vector3d currentVelCmd; // Current velocity command
 
 private:
   mc_rtc::Configuration config_;
@@ -59,7 +70,6 @@ private:
   bool byPassQPControl(); 
 
   std::string robotName_;
-  std::vector<std::string> jointNames_;
 
   // Mode switching
   bool useQP_ = true;

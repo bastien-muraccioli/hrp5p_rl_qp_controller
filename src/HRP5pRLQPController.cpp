@@ -1,4 +1,5 @@
 #include "HRP5pRLQPController.h"
+#include <mc_rtc/gui/ArrayInput.h>
 
 #include <RBDyn/MultiBodyConfig.h>
 
@@ -68,6 +69,8 @@ void HRP5pRLQPController::initializeRobot()
 
   q_rl = Eigen::VectorXd::Zero(dofNumber);
   q_zero = Eigen::VectorXd::Zero(dofNumber);
+  actionScale = Eigen::VectorXd::Zero(dofNumber);
+  currentActionScaled = Eigen::VectorXd::Zero(dofNumber);
   kp_ = Eigen::VectorXd::Zero(dofNumber);
   kd_ = Eigen::VectorXd::Zero(dofNumber);
   kpBase_ = Eigen::VectorXd::Zero(dofNumber);
@@ -75,31 +78,26 @@ void HRP5pRLQPController::initializeRobot()
   
   // Get the gains from the configuration or set default values
   pdGainsRatio_ = config_("policies")[currentPolicyIndex]("pd_gains_ratio", 1.0);
+  std::map<std::string, double> actionScale_map = config_("policies")[currentPolicyIndex]("action_scale");
   std::map<std::string, double> kp_map = config_("policies")[currentPolicyIndex]("kp");
   std::map<std::string, double> kd_map = config_("policies")[currentPolicyIndex]("kd");
-  std::map<std::string, double> q0_map = config_("policies")[currentPolicyIndex]("q0");
+  // std::map<std::string, double> q0_map = config_("policies")[currentPolicyIndex]("q0");
+
+  auto q0_cfg = config_("policies")[currentPolicyIndex]("q0");
+  auto keys = q0_cfg.keys(); // this preserves order
   
-  // Get the default posture target from the robot's posture task
-  std::shared_ptr<mc_tasks::PostureTask> FSMPostureTask = getPostureTask(robot().name());
-  auto posture = FSMPostureTask->posture();
+  auto currentPos = robot().mbc().q; // Current joint positions from the robot state
   int i = 0;
-  std::vector<std::string> joint_names;
-  joint_names.reserve(robot().mb().joints().size());
-  
-  for (const auto &j : robot().mb().joints()) {
-      const std::string &joint_name = j.name();
-      if(j.type() == rbd::Joint::Type::Rev)
-      {
-        jointNames_.emplace_back(joint_name);  
-        mc_rtc::log::info("[HRP5pRLQPController] Found joint: {}", joint_name);
-        if (const auto &t = posture[robot().jointIndexByName(joint_name)]; !t.empty()) {
-            kpBase_[i] = kp_map.at(joint_name);
-            kdBase_[i] = kd_map.at(joint_name);
-            q_zero[i] = q0_map.at(joint_name);
-            q_rl[i] = t[0];
-            i++;
-        }
-      }
+  for (const auto & key : keys) 
+  { 
+    std::string joint_name = key;
+    jointNames.emplace_back(joint_name);
+    kpBase_[i] = kp_map.at(joint_name);
+    kdBase_[i] = kd_map.at(joint_name);
+    q_zero[i] = q0_cfg(key);
+    q_rl[i] = currentPos[robot().jointIndexByName(joint_name)][0];
+    actionScale[i] = actionScale_map.at(joint_name);
+    i++;
   }
 
   kp_ = pdGainsRatio_ * kpBase_;
@@ -114,32 +112,59 @@ void HRP5pRLQPController::initializeRLPolicy()
   policyPaths_ = config_("policy_path", std::vector<std::string>{"walking_better_h1.onnx"});
   configRL();
 
-  // Observation example, must be modified based on the policy requirements.
-  // auto & real_robot = realRobot(robots()[0].name());
-  // std::string baseName = "pelvis";
-  // auto & imu = robot().bodySensor("Accelerometer");
-  // baseAngVel = imu.angularVelocity();
-  // Eigen::Matrix3d baseRot = real_robot.bodyPosW(baseName).rotation();
-  // rpy = mc_rbdyn::rpyFromMat(baseRot);
-  // // Initialize reference position and last actions for action blending
-  // jointPos = Eigen::VectorXd::Zero(dofNumber);
-  // jointVel = Eigen::VectorXd::Zero(dofNumber);
-  // jointAction = Eigen::VectorXd::Zero(dofNumber);
-  // velCmdRL = Eigen::Vector3d::Zero();  // Default command (x, y, yaw)
-  // phase = 0.0;  // Phase for periodic gait
-
   currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
-  currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
+  int actionSize = rlPolicy->getActionSize();
+  currentAction = Eigen::VectorXd::Zero(actionSize);
+
+  Eigen::VectorXd floatingBase_qIn = rbd::paramToVector(robot().mb(), robot().mbc().q);
+  // Suppose you have the IMU orientation (rotation from IMU to world)
+  Eigen::VectorXd q_imu_vector = floatingBase_qIn.segment(0, 4);
+  Eigen::Quaterniond q_imu_to_world = Eigen::Quaterniond::Identity();
+  q_imu_to_world.w() = q_imu_vector(0);
+  q_imu_to_world.x() = q_imu_vector(1);
+  q_imu_to_world.y() = q_imu_vector(2);
+  q_imu_to_world.z() = q_imu_vector(3);
+
+  Eigen::Matrix3d R_world_to_imu = q_imu_to_world.toRotationMatrix();
+  Eigen::Vector3d gravity_b = R_world_to_imu.transpose() * Eigen::Vector3d(0.0, 0.0, -9.81);
+
+  // Observation initialization
+  Eigen::Vector3d initProjectedGravity = gravity_b.normalized();   
+
+  currentVelCmd.setZero();
+
+  Eigen::VectorXd q_rl_framework_ordered = Eigen::VectorXd::Zero(dofNumber);
+  Eigen::VectorXd q_0_rl_framework_ordered = Eigen::VectorXd::Zero(dofNumber);
+  for (size_t i = 0; i < mcRtcToRLFrameworkJointMap.size(); ++i) {
+    int rl_index = mcRtcToRLFrameworkJointMap[i];
+    if (rl_index >= 0 && rl_index < dofNumber) {
+      q_rl_framework_ordered(rl_index) = q_rl(i);
+      q_0_rl_framework_ordered(rl_index) = q_zero(i);
+    } else {
+      mc_rtc::log::warning("Joint '{}' at index {} in mc_rtc order is not mapped to RL framework joint index. This joint will be ignored in the observation.", jointNames[i], i);
+    }
+  }
+
+  // Initialize all history slots
+  for (int i = 0; i < HISTORY_SIZE; ++i) {
+      linVel[i].setZero();
+      angVel[i].setZero();
+      projectedGravity[i] = initProjectedGravity;
+      velCmd[i].setZero();
+      jointPos[i] = q_rl_framework_ordered - q_0_rl_framework_ordered; // Start with current joint positions
+      jointVel[i] = Eigen::VectorXd::Zero(dofNumber);
+      jointAction[i] = Eigen::VectorXd::Zero(actionSize);
+  }
 }
 
 void HRP5pRLQPController::switchPolicy(int policyIndex)
 {
   if(policyIndex < 0 || policyIndex >= static_cast<int>(policyPaths_.size())) {
-    mc_rtc::log::error("Invalid policy index: {}", policyIndex);
+    mc_rtc::log::error("[HRP5pRLQPController] Invalid policy index: {}", policyIndex);
     return;
   }
   
-  mc_rtc::log::info("Switching from policy [{}] to policy [{}]", currentPolicyIndex, policyIndex);
+  mc_rtc::log::info("[HRP5pRLQPController] Switching from policy [{}] to policy [{}]", currentPolicyIndex, policyIndex);
   currentPolicyIndex = size_t(policyIndex);
   
   // Update policy-specific boolean flags
@@ -155,6 +180,7 @@ void HRP5pRLQPController::switchPolicy(int policyIndex)
   std::map<std::string, double> kp_map = config_("policies")[currentPolicyIndex]("kp");
   std::map<std::string, double> kd_map = config_("policies")[currentPolicyIndex]("kd");
   std::map<std::string, double> q0_map = config_("policies")[currentPolicyIndex]("q0");
+  std::map<std::string, double> actionScale_map = config_("policies")[currentPolicyIndex]("action_scale");
 
   for(int i = 0; i < dofNumber; ++i) {
     const auto & jName = robot().mb().joint(static_cast<int>(i + 1)).name();  // +1 to skip Root
@@ -166,6 +192,9 @@ void HRP5pRLQPController::switchPolicy(int policyIndex)
     }
     if(q0_map.count(jName)) {
       q_zero[i] = q0_map[jName];
+    }
+    if(actionScale_map.count(jName)) {
+      actionScale[i] = actionScale_map[jName];
     }
   }
   // Update PD gains
@@ -197,7 +226,7 @@ bool HRP5pRLQPController::byPassQPControl()
   Eigen::VectorXd tau_rl = (kp_).cwiseProduct(q_rl - q) - (kd_).cwiseProduct(q_dot);
   
   int i = 0;
-  for (const auto &joint_name : jointNames_)
+  for (const auto &joint_name : jointNames)
   {
     tau[robot().jointIndexByName(joint_name)][0] = tau_rl[i];
     i++;
@@ -221,6 +250,8 @@ void HRP5pRLQPController::addLog()
   logger().addLogEntry("HRP5pRLQPController_RL_qZero", [this]() { return q_zero; });
   logger().addLogEntry("HRP5pRLQPController_RL_currentObservation", [this]() { return currentObservation; });
   logger().addLogEntry("HRP5pRLQPController_RL_currentAction", [this]() { return currentAction; });
+  logger().addLogEntry("HRP5pRLQPController_RL_currentActionScaled", [this]() { return currentActionScaled; });
+  logger().addLogEntry("HRP5pRLQPController_RL_actionScale", [this]() { return actionScale; });
   
   // Controller state variables
   logger().addLogEntry("HRP5pRLQPController_useQP", [this]() { return useQP_; });
@@ -230,6 +261,17 @@ void HRP5pRLQPController::addLog()
   logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { 
     return std::to_string(currentPolicyIndex) + ": " + policyPaths_[currentPolicyIndex]; 
   });
+
+  // Log observation
+  for (int i = 0; i < HISTORY_SIZE; ++i) {
+    logger().addLogEntry("HRP5pRLQPController_obs_linVel_" + std::to_string(i), [this, i]() { return linVel[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_angVel_" + std::to_string(i), [this, i]() { return angVel[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_projectedGravity_" + std::to_string(i), [this, i]() { return projectedGravity[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_velCmd_" + std::to_string(i), [this, i]() { return velCmd[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_jointPos_" + std::to_string(i), [this, i]() { return jointPos[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_jointVel_" + std::to_string(i), [this, i]() { return jointVel[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_jointAction_" + std::to_string(i), [this, i]() { return jointAction[i]; });
+  }
 }
 
 void HRP5pRLQPController::addGui()
@@ -253,14 +295,14 @@ void HRP5pRLQPController::addGui()
         if(it != policyPaths_.end()) 
         {
           int newIndex = static_cast<int>(std::distance(policyPaths_.begin(), it));
-          mc_rtc::log::info("User requested policy switch to [{}]: {}", newIndex, selected);
+          mc_rtc::log::info("[HRP5pRLQPController] User requested policy switch to [{}]: {}", newIndex, selected);
           // Switch to new policy without reinitializing robot
           switchPolicy(newIndex);
         }
       }),
     mc_rtc::gui::Button("Reload current policy", [this]() 
     {
-      mc_rtc::log::info("User requested to reload current policy [{}]", currentPolicyIndex);
+      mc_rtc::log::info("[HRP5pRLQPController] User requested to reload current policy [{}]", currentPolicyIndex);
       switchPolicy(int(currentPolicyIndex));
     })
   );
@@ -299,33 +341,79 @@ void HRP5pRLQPController::addGui()
         return useQP_ ? "Enforced" : "Bypassed";
       })
     );
+  
+    gui()->addElement({"HRP5pRLQPController", "Velocity Command"},
+      mc_rtc::gui::ArrayInput("Current Velocity Command", {"vx", "vy", "yaw_rate"}, currentVelCmd));
 }
 
 void HRP5pRLQPController::configRL()
 {
-  mc_rtc::log::info("Loading RL policy [{}]: {}", currentPolicyIndex, policyPaths_[currentPolicyIndex]);
+  mc_rtc::log::info("[HRP5pRLQPController] Loading RL policy [{}]: {}", currentPolicyIndex, policyPaths_[currentPolicyIndex]);
   try {
     rlPolicy = std::make_unique<RLPolicyInterface>(policyPaths_[currentPolicyIndex]);
     if(rlPolicy) {
-      mc_rtc::log::success("RL policy loaded successfully");
+      mc_rtc::log::success("[HRP5pRLQPController] RL policy loaded successfully");
       // Initialize observation vector with the correct size from the loaded policy
       currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
-      mc_rtc::log::info("Initialized observation vector with size: {}", rlPolicy->getObservationSize());
+      mc_rtc::log::info("[HRP5pRLQPController] Initialized observation vector with size: {}", rlPolicy->getObservationSize());
       currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
-      mc_rtc::log::info("Initialized action vector with size: {}", rlPolicy->getActionSize());
+      mc_rtc::log::info("[HRP5pRLQPController] Initialized action vector with size: {}", rlPolicy->getActionSize());
     } else {
-      mc_rtc::log::error_and_throw("RL policy creation failed - policy is null");
+      mc_rtc::log::error_and_throw("[HRP5pRLQPController] RL policy creation failed - policy is null");
     }
   } catch(const std::exception& e) {
-    mc_rtc::log::error_and_throw("Failed to load RL policy: {}", e.what());
+    mc_rtc::log::error_and_throw("[HRP5pRLQPController] Failed to load RL policy: {}", e.what());
   }
 
-  actionScale = config_("policies")[currentPolicyIndex]("action_scale", 1.0);
-  policyStepSize = config_("policies")[currentPolicyIndex]("policy_step_size", 0.01);
-
-  int physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 0.001);
+  policyStepSize = config_("policies")[currentPolicyIndex]("policy_step_size", 1.0);
+  int physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 1.0);
   if(physicsStepSize - timeStep > 1e-6) {
-    mc_rtc::log::warning("Physics step size ({:.3f} s) is larger than controller time step ({:.3f} s). This may cause issues with the policy. Consider fixing the controller time step.", physicsStepSize, timeStep);
+    mc_rtc::log::warning("[HRP5pRLQPController] Physics step size ({:.3f} s) is larger than controller time step ({:.3f} s). This may cause issues with the policy. Consider fixing the controller time step.", physicsStepSize, timeStep);
+  }
+
+  refJointOrder = config_("policies")[currentPolicyIndex]("ref_joint_order", std::vector<std::string>{});
+  if(refJointOrder.size() != size_t(rlPolicy->getActionSize())) {
+    mc_rtc::log::error_and_throw("[HRP5pRLQPController] Reference joint order size ({}) does not match policy action size ({}). Please check the configuration.", refJointOrder.size(), rlPolicy->getActionSize());
+  }
+
+  // Create mapping from action indices to robot joint indices based on the reference joint order
+  actionToDofMap.resize(refJointOrder.size(), -1); // Initialize with -1 to indicate unmapped actions
+  for (size_t j = 0; j < refJointOrder.size(); ++j) {
+    for (int i = 0; i < dofNumber; ++i) {
+      if (jointNames[i] == refJointOrder[j]) {
+        actionToDofMap[j] = i;
+        // mc_rtc::log::info("[HRP5pRLQPController] Mapping action index {} to joint[{}] '{}'", j, i, jointNames[i]);
+        break;
+      }
+    }
+  }
+
+  // Create mapping between RL framework joint order and mc_rtc joint indices, this is useful for correctly ordering the observation and action vectors according to the robot's joint order in mc_rtc.
+  auto action_scale_cfg = config_("policies")[currentPolicyIndex]("action_scale");
+  auto keys = action_scale_cfg.keys(); // this preserves order
+
+  if (keys.size() != static_cast<size_t>(dofNumber)) {
+    mc_rtc::log::error_and_throw("[HRP5pRLQPController] The number of joints in action_scale config ({}) does not match the robot's dof number ({}). Please check the configuration.", keys.size(), dofNumber);
+  }
+
+  // rlFrameworkToMcRtcJointMap.resize(dofNumber, -1); // Initialize with -1 to indicate unmapped joints
+  mcRtcToRLFrameworkJointMap.resize(dofNumber, -1);
+  int j = 0;
+  for (const auto & key : keys) { 
+    for (int i = 0; i < dofNumber; ++i) {
+      if (jointNames[i] == key) {
+        // rlFrameworkToMcRtcJointMap[j] = i;
+        mcRtcToRLFrameworkJointMap[i] = j;
+        break;
+      }
+    }
+    j++;
+  }
+
+  for (int i = 0; i < dofNumber; ++i) {
+    if (mcRtcToRLFrameworkJointMap[i] == -1) {
+      mc_rtc::log::error_and_throw("[HRP5pRLQPController] Joint '{}' was not properly mapped!", jointNames[i]);
+    }
   }
 }
 
@@ -335,12 +423,12 @@ bool HRP5pRLQPController::manageModeSwitching()
   {
     if(isTorqueControl_)
     {
-      mc_rtc::log::info("Switching to Torque Control");
+      mc_rtc::log::info("[HRP5pRLQPController] Switching to Torque Control");
       datastore().assign<std::string>("ControlMode", "Torque");
     }
     else
     {
-      mc_rtc::log::info("Switching to Position Control");
+      mc_rtc::log::info("[HRP5pRLQPController] Switching to Position Control");
       datastore().assign<std::string>("ControlMode", "Position");
     }
     controlModeChanged_ = false;
