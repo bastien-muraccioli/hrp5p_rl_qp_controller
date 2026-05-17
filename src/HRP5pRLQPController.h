@@ -18,11 +18,15 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
 
   bool run() override;
   void reset(const mc_control::ControllerResetData & reset_data) override;
+  void activateQPControl(bool activate);
+  void activateTorqueControl(bool activate);
+  void activateContactConstraints(bool activate);
 
   // Task
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
+  std::shared_ptr<mc_tasks::PostureTask> postureTask;
   
-  int dofNumber = 0;
+  int nbActuatedJoints = 0;
   std::vector<std::string> jointNames;
 
   // Public RL related variables
@@ -35,10 +39,10 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
 
   Eigen::VectorXd actionScale;
   double policyStepSize;
-  std::vector<std::string> refJointOrder;
+  std::vector<std::string> refJointOrderRLAction;
   std::vector<int> actionToDofMap; // size = actionSize
-  // std::vector<int> rlFrameworkToMcRtcJointMap; // size = dofNumber
-  std::vector<int> mcRtcToRLFrameworkJointMap; // size = dofNumber
+  // std::vector<int> rlFrameworkToMcRtcJointMap; // size = nbActuatedJoints
+  std::vector<int> mcRtcToRLFrameworkJointMap; // size = nbActuatedJoints
 
   size_t currentPolicyIndex = 0;
   std::unique_ptr<RLPolicyInterface> rlPolicy;
@@ -51,6 +55,8 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   std::array<Eigen::Vector3d, HISTORY_SIZE> velCmd; // Command vector [vx, vy, yaw_rate]
 
   Eigen::Vector3d currentVelCmd; // Current velocity command
+
+  void setHighPDGains(bool high); 
 
 private:
   mc_rtc::Configuration config_;
@@ -68,25 +74,29 @@ private:
   bool manageModeSwitching();
   // Directly use RL output without QP modifications (Torque Control only) 
   bool byPassQPControl(); 
+  void updateExternalTorque();
+  void computeLimits();
+
+  Eigen::VectorXd externalTorques_;
 
   std::string robotName_;
 
   // Mode switching
   bool useQP_ = true;
-  bool isTorqueControl_ = true;
+  bool isTorqueControl_ = false;
   bool controlModeChanged_ = false;
 
   // Constraint configuration
-  double velPercent_ = 0.95; // Percentage of the max velocity taking account in the joint velocity constraint.
-  double dsPercent_ = 0.01; // Percentage of the max joint range taking account in the joint position limit constraint.
+  double velPercent_ = 0.99; // Percentage of the max velocity taking account in the joint velocity constraint.
+  double dsPercent_ = 0.0; // Percentage of the max joint range taking account in the joint position limit constraint.
   double diPercent_ = 0.1; // Doesn't matter since di > ds. This variable is not used in the constraint dynamics.
 
   // CBF Gains More details are explained in the paper cf. Readme.md. 
   // Must be tuned depending on the robot.
   double zeta_jointLimit_ = 1.2;
-  double lambda_jointLimit_ = 100.0; // Same gain for joint position limits and velocity limits. 
+  double lambda_jointLimit_ = 200.0; // Same gain for joint position limits and velocity limits. 
   double zeta_selfCollision_ = 1.2;
-  double lambda_selfCollision_ = 10.0; 
+  double lambda_selfCollision_ = 100.0; 
 
   // Gains
   double pdGainsRatio_ = 1.0;
@@ -94,7 +104,20 @@ private:
   Eigen::VectorXd kd_;  // Gains set to the robot/simulator = pd_gains_ratio * kd_base
   Eigen::VectorXd kpBase_; // Base RL PD gains from config
   Eigen::VectorXd kdBase_; // Base RL PD gains from config
+  Eigen::VectorXd highKpBase_; // Base High gain PD gains from config
+  Eigen::VectorXd highKdBase_; // Base High gain PD gains from config
 
   // RL
   std::vector<std::string> policyPaths_;
+  Eigen::VectorXd tau_rl_;
+
+  Eigen::VectorXd q;
+  Eigen::VectorXd q_real;
+  Eigen::VectorXd alpha;
+  Eigen::VectorXd alpha_real;
+
+  bool computeExternalTorque_ = false;
+
+  bool contactModeChanged_ = true;
+  bool contactConstraintsAreEnabled_ = true;
 };
