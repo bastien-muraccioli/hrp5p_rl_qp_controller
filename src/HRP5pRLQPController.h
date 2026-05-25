@@ -2,12 +2,14 @@
 
 #include <mc_control/fsm/Controller.h>
 #include <mc_tasks/TorqueJointTask.h>
+#include <SpaceVecAlg/EigenTypedef.h>
 
 #include "api.h"
 
 #include "RLPolicyInterface.h"
 #include "utils.h"
 #include <Eigen/src/Core/Matrix.h>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -21,10 +23,12 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   void activateQPControl(bool activate);
   void activateTorqueControl(bool activate);
   void activateContactConstraints(bool activate);
+  void initializeRLObservation();
 
   // Task
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
   std::shared_ptr<mc_tasks::PostureTask> postureTask;
+  std::map<std::string, std::vector<double>> defaultPostureTarget; // q0
   
   int nbActuatedJoints = 0;
   std::vector<std::string> jointNames;
@@ -49,10 +53,11 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   utils utilsClass; // Utility functions for RL controller
 
   // observation
-  static constexpr int HISTORY_SIZE = 3; // Number of past time steps to include in the observation
+  static constexpr int HISTORY_SIZE = 5; // Number of past time steps to include in the observation
   std::array<Eigen::Vector3d, HISTORY_SIZE> linVel, angVel, projectedGravity;
   std::array<Eigen::VectorXd, HISTORY_SIZE> jointPos, jointVel, jointAction;
   std::array<Eigen::Vector3d, HISTORY_SIZE> velCmd; // Command vector [vx, vy, yaw_rate]
+  std::array<Eigen::Vector6d, HISTORY_SIZE> footContactForces;
 
   Eigen::Vector3d currentVelCmd; // Current velocity command
 
@@ -68,7 +73,6 @@ private:
   void initializeRobot();
   void configRL();
   void initializeRLPolicy();
-  void switchPolicy(int policyIndex);  
 
   // Handle switching between Torque and Position control modes. Torque control is better for directly applying the RL torques, while position control is simulating the torque reference in high gains position control which is experimental. Except in simulation avoid switching between control modes during the execution on the real robot to prevent potential issues with the hardware.
   bool manageModeSwitching();
@@ -115,6 +119,8 @@ private:
   Eigen::VectorXd q_real;
   Eigen::VectorXd alpha;
   Eigen::VectorXd alpha_real;
+
+  std::map<std::string, double> q0_map_;
 
   bool computeExternalTorque_ = false;
 
