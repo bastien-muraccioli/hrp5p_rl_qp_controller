@@ -232,46 +232,26 @@ void HRP5pRLQPController::initializeRLObservation()
   }
 
   // gravity, fb linear and angular velocity in floating base frame -------------------------------- 
-
-  Eigen::VectorXd floatingBase_qIn = rbd::paramToVector(robot.mb(), robot.mbc().q);
-  Eigen::VectorXd floatingBase_alphaIn = rbd::paramToVector(robot.mb(), robot.mbc().alpha);
-
-  // Eigen::VectorXd q_fb_vector = floatingBase_qIn.segment(0, 4);
-  // Eigen::Quaterniond q_fb_in_world = Eigen::Quaterniond::Identity();
-  // q_fb_in_world.w() = q_fb_vector(0);
-  // q_fb_in_world.x() = q_fb_vector(1);
-  // q_fb_in_world.y() = q_fb_vector(2);
-  // q_fb_in_world.z() = q_fb_vector(3);
-
-  // Eigen::Matrix3d R_world_to_fb = q_fb_in_world.toRotationMatrix().transpose(); // Rotation from world to floating base frame
-  // Eigen::Vector3d gravity_b = (R_world_to_fb * Eigen::Vector3d(0.0, 0.0, -9.81)).normalized();
-  // Eigen::Vector3d linVel_b = R_world_to_fb * floatingBase_alphaIn.segment(3, 3);
-  // Eigen::Vector3d angVel_b = R_world_to_fb * floatingBase_alphaIn.segment(0, 3);
-
-  // Body orientation in world
-  const sva::PTransformd& X_0_body = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
-
-  // Rotation world -> body
+  sva::PTransformd X_0_body = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
+  sva::MotionVecd bodyVel = robot.mbc().bodyVelB[robot.mb().bodyIndexByName("Body")];
   Eigen::Matrix3d R_world_to_body = X_0_body.rotation();
-
-  // express in BODY frame
-  Eigen::Vector3d gravity_b = (R_world_to_body * Eigen::Vector3d(0.0, 0.0, -9.81)).normalized();
-  Eigen::Vector3d angVel_b = R_world_to_body * floatingBase_alphaIn.segment(0, 3);
-  Eigen::Vector3d linVel_b = R_world_to_body * floatingBase_alphaIn.segment(3, 3);
-
-  // express in World frame
-  // Eigen::Vector3d angVel_b = floatingBase_alphaIn.segment(0, 3);
-  // Eigen::Vector3d linVel_b = floatingBase_alphaIn.segment(3, 3);
-
+  Eigen::Vector3d gravity_b = R_world_to_body * Eigen::Vector3d(0.0, 0.0, -1.0);
+  Eigen::Vector3d angVel_b = bodyVel.angular();
+  Eigen::Vector3d linVel_b = bodyVel.linear();
 
   // Contact forces -------------------------------------------------
-
+  auto log1p_compress = [](const Eigen::Vector3d& f) -> Eigen::Vector3d {
+    return Eigen::Vector3d(
+        std::copysign(std::log1p(std::abs(f.x())), f.x()),
+        std::copysign(std::log1p(std::abs(f.y())), f.y()),
+        std::copysign(std::log1p(std::abs(f.z())), f.z())
+    );
+  };
   Eigen::Vector6d footContactForces_vector = Eigen::Vector6d::Zero();
   auto forceSensorRight = robot.forceSensor("RightFootForceSensor");
   auto forceSensorLeft = robot.forceSensor("LeftFootForceSensor");
-  footContactForces_vector.segment(0, 3) = forceSensorRight.wrenchWithoutGravity(robot).force();
-  footContactForces_vector.segment(3, 3) = forceSensorLeft.wrenchWithoutGravity(robot).force();
-  
+  footContactForces_vector.segment(0, 3) = log1p_compress(forceSensorLeft.worldWrench(robot).force());;
+  footContactForces_vector.segment(3, 3) = log1p_compress(forceSensorRight.worldWrench(robot).force());;
 
   projectedGravity[0] = gravity_b;
   angVel[0] = angVel_b;
@@ -281,10 +261,6 @@ void HRP5pRLQPController::initializeRLObservation()
   jointVel[0] = q_dot_rlFrameworkOrdered;
   jointAction[0] = currentAction;
   footContactForces[0] = footContactForces_vector;
-
-  mc_rtc::log::info("linVel: {}\n angVel: {}\n projectedGravity: {}\n velCmd: {}\n jointPos: {}\n jointVel: {}\n jointAction: {}", 
-    linVel[0].transpose(), angVel[0].transpose(), projectedGravity[0].transpose(), velCmd[0].transpose(), 
-    jointPos[0].transpose(), jointVel[0].transpose(), jointAction[0].transpose());
 }
 
 bool HRP5pRLQPController::byPassQPControl()
@@ -356,6 +332,7 @@ void HRP5pRLQPController::addLog()
     logger().addLogEntry("HRP5pRLQPController_obs_jointPos_" + std::to_string(i), [this, i]() { return jointPos[i]; });
     logger().addLogEntry("HRP5pRLQPController_obs_jointVel_" + std::to_string(i), [this, i]() { return jointVel[i]; });
     logger().addLogEntry("HRP5pRLQPController_obs_jointAction_" + std::to_string(i), [this, i]() { return jointAction[i]; });
+    logger().addLogEntry("HRP5pRLQPController_obs_footContactForces_" + std::to_string(i), [this, i]() { return footContactForces[i]; });
   }
 
   logger().addLogEntry("HRP5pRLQPController_q", [this]() { return q; });

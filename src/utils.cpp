@@ -49,12 +49,9 @@ void utils::run_rl_state(mc_control::fsm::Controller & ctl_)
       for (int j = 0; j < ctl.currentAction.size(); ++j) {
           int i = ctl.actionToDofMap[j];
           ctl.currentActionScaled(i) = ctl.actionScale(i) * ctl.currentAction(j);
-          // mc_rtc::log::info("joint({}) {}: action scale {} * action {} -> scaled action {}", i, ctl.jointNames[i], ctl.actionScale(i), ctl.currentAction(j), ctl.currentActionScaled(i));
-          ctl.q_rl(i) = ctl.q_zero(i) + ctl.currentActionScaled(i);
-          mc_rtc::log::info("joint({}) {}: q_zero {} + currentActionScaled {} -> q_rl {}", i, ctl.jointNames[i], ctl.q_zero(i), ctl.currentActionScaled(i), ctl.q_rl(i));
+          ctl.q_rl(i) = ctl.currentActionScaled(i) + ctl.q_zero(i);
+          // mc_rtc::log::info("joint({}) {}: q_zero {} + currentActionScaled {} -> q_rl {}", i, ctl.jointNames[i], ctl.q_zero(i), ctl.currentActionScaled(i), ctl.q_rl(i));
       }
-      // Run new inference and update target position, scaled by action scale
-      // ctl.q_rl = ctl.q_zero + ctl.currentActionScaled;
       syncTime_ = 0.0;
     }
   }
@@ -72,8 +69,7 @@ void utils::teardown_rl_state(mc_control::fsm::Controller & ctl_)
 Eigen::VectorXd utils::getCurrentObservation(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<HRP5pRLQPController&>(ctl_);
-  Eigen::VectorXd obs(ctl.rlPolicy->getObservationSize());
-  obs = Eigen::VectorXd::Zero(ctl.rlPolicy->getObservationSize());
+  Eigen::VectorXd obs = Eigen::VectorXd::Zero(ctl.rlPolicy->getObservationSize());
 
   int offset = 0;
   auto appendToObs = [&](const Eigen::VectorXd& v) {
@@ -156,6 +152,15 @@ Eigen::VectorXd utils::getCurrentObservation(mc_control::fsm::Controller & ctl_)
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.footContactForces[i]);
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.jointAction[i]);
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.velCmd[i]);
+
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.linVel[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.angVel[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.projectedGravity[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointPos[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointVel[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.footContactForces[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointAction[i]);
+      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.velCmd[i]);
       break;
     }
     default:
