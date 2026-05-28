@@ -56,12 +56,14 @@ bool HRP5pRLQPController::run()
   q_real = rbd::sParamToVector(real_robot.mb(), q_real_mbc);
   alpha_real = rbd::sDofToVector(real_robot.mb(), qdot_real_mbc);
 
-  computeLimits();
+  if(printLimits_) computeLimits();
+
   if(contactModeChanged_)
   {
     if(contactConstraintsAreEnabled_)
     {
-      Eigen::Vector6d footcontact_dof = Eigen::Vector6d(1, 1, 1, 1, 1, 1);
+      Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
+      // Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Zero();
       addContact({robot().name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
       addContact({robot().name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
     }
@@ -123,8 +125,6 @@ void HRP5pRLQPController::initializeRobot()
   std::map<std::string, double> highKp_map = config_("high_kp");
   std::map<std::string, double> highKd_map = config_("high_kd");
   q0_map_ = config_("policies")[currentPolicyIndex]("q0");
-  
-  auto currentPos = robot().mbc().q; // Current joint positions from the robot state
 
   auto updateIfExists =
     [&](auto& target,
@@ -190,8 +190,8 @@ void HRP5pRLQPController::initializeRLObservation()
 
   // ---------------- Joint positions and velocities ---------------------------------------
 
-  std::vector<std::vector<double>> q_mbc = robot.mbc().q; // MBC order
-  std::vector<std::vector<double>> q_dot_mbc = robot.mbc().alpha; // MBC order
+  const auto & q_mbc = robot.mbc().q; // MBC order
+  const auto & q_dot_mbc = robot.mbc().alpha; // MBC order
   Eigen::VectorXd q_rlFrameworkOrdered, q_0_rlFrameworkOrdered, q_dot_rlFrameworkOrdered;
 
   if (currentPolicyIndex < 2) // Use all joints as observation
@@ -205,8 +205,8 @@ void HRP5pRLQPController::initializeRLObservation()
       const auto & joint_name = jointNames[i];
 
       // Fill mc_rtc ordered vectors
-      double q = q_mbc[robot.jointIndexByName(joint_name)][0];
-      double q_dot = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
+      const double q = q_mbc[robot.jointIndexByName(joint_name)][0];
+      const double q_dot = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
 
       // RL remapping
       int rl_index = mcRtcToRLFrameworkJointMap[i];
@@ -217,7 +217,7 @@ void HRP5pRLQPController::initializeRLObservation()
   }
   else // Use only the joints that are in the action space as observation 
   {
-    int policyObsJointSize = rlPolicy->getActionSize();
+    const int policyObsJointSize = rlPolicy->getActionSize();
     q_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
     q_0_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
     q_dot_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
@@ -232,8 +232,8 @@ void HRP5pRLQPController::initializeRLObservation()
   }
 
   // gravity, fb linear and angular velocity in floating base frame -------------------------------- 
-  sva::PTransformd X_0_body = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
-  sva::MotionVecd bodyVel = robot.mbc().bodyVelB[robot.mb().bodyIndexByName("Body")];
+  const auto & X_0_body = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
+  const auto & bodyVel = robot.mbc().bodyVelB[robot.mb().bodyIndexByName("Body")];
   Eigen::Matrix3d R_world_to_body = X_0_body.rotation();
   Eigen::Vector3d gravity_b = R_world_to_body * Eigen::Vector3d(0.0, 0.0, -1.0);
   Eigen::Vector3d angVel_b = bodyVel.angular();
@@ -248,8 +248,8 @@ void HRP5pRLQPController::initializeRLObservation()
     );
   };
   Eigen::Vector6d footContactForces_vector = Eigen::Vector6d::Zero();
-  auto forceSensorRight = robot.forceSensor("RightFootForceSensor");
-  auto forceSensorLeft = robot.forceSensor("LeftFootForceSensor");
+  const auto & forceSensorRight = robot.forceSensor("RightFootForceSensor");
+  const auto & forceSensorLeft = robot.forceSensor("LeftFootForceSensor");
   footContactForces_vector.segment(0, 3) = log1p_compress(forceSensorLeft.worldWrench(robot).force());;
   footContactForces_vector.segment(3, 3) = log1p_compress(forceSensorRight.worldWrench(robot).force());;
 
@@ -276,14 +276,14 @@ bool HRP5pRLQPController::byPassQPControl()
   robot().forwardVelocity();
   robot().forwardAcceleration();
 
-  std::vector<std::vector<double>> q_mbc = robot().mbc().q;
-  std::vector<std::vector<double>> q_dot_mbc = robot().mbc().alpha;
+  const auto & q_mbc = robot().mbc().q;
+  const auto & q_dot_mbc = robot().mbc().alpha;
 
   int i = 0;
   for(const auto &joint_name : jointNames)
   {
-      double q = q_mbc[robot().jointIndexByName(joint_name)][0];
-      double q_dot = q_dot_mbc[robot().jointIndexByName(joint_name)][0];
+      const double q = q_mbc[robot().jointIndexByName(joint_name)][0];
+      const double q_dot = q_dot_mbc[robot().jointIndexByName(joint_name)][0];
       tau_rl_(i) = kp_(i) * (q_rl(i) - q) - kd_(i) * q_dot;
       robot().mbc().jointTorque[robot().jointIndexByName(joint_name)][0] = tau_rl_(i);
       // mc_rtc::log::info("[HRP5pRLQPController] Bypassing QP control for joint({}) '{}': tau_rl = kp * (q_rl - q) - kd * q_dot = {} * ({} - {}) - {} * {} -> tau_rl {}", 
@@ -399,6 +399,14 @@ void HRP5pRLQPController::addGui()
       mc_rtc::gui::Label("Contact constraint", [this]()
         {
           return contactConstraintsAreEnabled_ ? "Enabled" : "Disabled";
+        }),
+      mc_rtc::gui::Button("Toggle print joint limits", [this]()
+        {
+          printLimits_ = !printLimits_;
+        }),
+      mc_rtc::gui::Label("Print joint limits", [this]()
+        {
+          return printLimits_ ? "Enabled" : "Disabled";
         })
     );
   
@@ -436,7 +444,7 @@ void HRP5pRLQPController::configRL()
   }
 
   policyStepSize = config_("policies")[currentPolicyIndex]("policy_step_size", 1.0);
-  double physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 1.0);
+  const double physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 1.0);
   if(physicsStepSize - timeStep > 1e-8) {
     mc_rtc::log::warning("[HRP5pRLQPController] Physics step size ({:.3f} s) is larger than controller time step ({:.3f} s). This may cause issues with the policy. Consider fixing the controller time step.", physicsStepSize, timeStep);
   }
@@ -566,15 +574,23 @@ void HRP5pRLQPController::updateExternalTorque()
 
   externalTorques_ -= dynamicsConstraint->dynamicFunction().contactTorque();
 
+  if(computeExternalTorque_ && !computeExternalTorqueHasChanged_)
+  {
+    mc_rtc::log::info("[HRP5pRLQPController] External torque computation enabled");
+    computeExternalTorqueHasChanged_ = computeExternalTorque_;
+  }
+  else if(!computeExternalTorque_ && computeExternalTorqueHasChanged_)
+  {
+    mc_rtc::log::info("[HRP5pRLQPController] External torque computation disabled");
+    computeExternalTorqueHasChanged_ = computeExternalTorque_;
+    robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
+    real_robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
+  }
+
   if(computeExternalTorque_)
   {
     robot.setExternalTorques(externalTorques_);
     real_robot.setExternalTorques(externalTorques_);
-  }
-  else
-  {
-    robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
-    real_robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
   }
 }
 
@@ -594,56 +610,56 @@ void HRP5pRLQPController::activateTorqueControl(bool activate)
 
 void HRP5pRLQPController::computeLimits()
 {
-  double epsilon = 1e-5;
+  const double epsilon = 1e-5;
 
   auto & real_robot = realRobot(robots()[0].name());
-  auto currentPos = real_robot.q();
-  auto currentVel = real_robot.alpha();
-  auto currentTau = real_robot.jointTorque();
+  const auto & currentPos = real_robot.q();
+  const auto & currentVel = real_robot.alpha();
+  const auto & currentTau = real_robot.jointTorque();
 
-  auto qLimLower = real_robot.ql();
-  auto qLimUpper = real_robot.qu();
+  const auto & qLimLower = real_robot.ql();
+  const auto & qLimUpper = real_robot.qu();
 
-  auto qDotLimLower = real_robot.vl();
-  auto qDotLimUpper = real_robot.vu();
+  const auto & qDotLimLower = real_robot.vl();
+  const auto & qDotLimUpper = real_robot.vu();
 
-  auto tauLimLower = real_robot.tl();
-  auto tauLimUpper = real_robot.tu();
+  const auto & tauLimLower = real_robot.tl();
+  const auto & tauLimUpper = real_robot.tu();
 
   for (std::string joint : robot().refJointOrder())
   {
     int i = robot().jointIndexByName(joint);
 
-    double ds = dsPercent_ * (qLimUpper[i][0] - qLimLower[i][0]);
-    double posLimitUp = qLimUpper[i][0] - ds;
-    double posLimitLow = qLimLower[i][0] + ds;
-    double velLimitUp = velPercent_ * qDotLimUpper[i][0];
-    double velLimitLow = velPercent_ * qDotLimLower[i][0];
-    double tauLimitUp = tauLimUpper[i][0];
-    double tauLimitLow = tauLimLower[i][0];
+    const double ds = dsPercent_ * (qLimUpper[i][0] - qLimLower[i][0]);
+    const double posLimitUp = qLimUpper[i][0] - ds;
+    const double posLimitLow = qLimLower[i][0] + ds;
+    const double velLimitUp = velPercent_ * qDotLimUpper[i][0];
+    const double velLimitLow = velPercent_ * qDotLimLower[i][0];
+    const double tauLimitUp = tauLimUpper[i][0];
+    const double tauLimitLow = tauLimLower[i][0];
 
-    // if (currentPos[i][0] > posLimitUp + epsilon)
-    // {
-    //   mc_rtc::log::warning("Joint {} position upper limit breached: currentPos = {}, limit = {}", joint, currentPos[i][0], posLimitUp);
-    // }
-    // if (currentPos[i][0] < posLimitLow - epsilon)
-    // {
-    //   mc_rtc::log::warning("Joint {} position lower limit breached: currentPos = {}, limit = {}", joint, currentPos[i][0], posLimitLow);
-    // }
-    // if (currentVel[i][0] > velLimitUp + epsilon)
-    // {
-    //   mc_rtc::log::warning("Joint {} velocity upper limit breached: currentVel = {}, limit = {}", joint, currentVel[i][0], velLimitUp);
-    // }
-    // if (currentVel[i][0] < velLimitLow - epsilon)
-    // {
-    //   mc_rtc::log::warning("Joint {} velocity lower limit breached: currentVel = {}, limit = {}", joint, currentVel[i][0], velLimitLow);
-    // }
-    // if (currentTau[i][0] > tauLimitUp + epsilon)    {
-    //   mc_rtc::log::warning("Joint {} torque upper limit breached: currentTau = {}, limit = {}", joint, currentTau[i][0], tauLimitUp);
-    // }
-    // if (currentTau[i][0] < tauLimitLow - epsilon)    {
-    //   mc_rtc::log::warning("Joint {} torque lower limit breached: currentTau = {}, limit = {}", joint, currentTau[i][0], tauLimitLow);
-    // }
+    if (currentPos[i][0] > posLimitUp + epsilon)
+    {
+      mc_rtc::log::warning("Joint {} position upper limit breached: currentPos = {}, limit = {}", joint, currentPos[i][0], posLimitUp);
+    }
+    if (currentPos[i][0] < posLimitLow - epsilon)
+    {
+      mc_rtc::log::warning("Joint {} position lower limit breached: currentPos = {}, limit = {}", joint, currentPos[i][0], posLimitLow);
+    }
+    if (currentVel[i][0] > velLimitUp + epsilon)
+    {
+      mc_rtc::log::warning("Joint {} velocity upper limit breached: currentVel = {}, limit = {}", joint, currentVel[i][0], velLimitUp);
+    }
+    if (currentVel[i][0] < velLimitLow - epsilon)
+    {
+      mc_rtc::log::warning("Joint {} velocity lower limit breached: currentVel = {}, limit = {}", joint, currentVel[i][0], velLimitLow);
+    }
+    if (currentTau[i][0] > tauLimitUp + epsilon)    {
+      mc_rtc::log::warning("Joint {} torque upper limit breached: currentTau = {}, limit = {}", joint, currentTau[i][0], tauLimitUp);
+    }
+    if (currentTau[i][0] < tauLimitLow - epsilon)    {
+      mc_rtc::log::warning("Joint {} torque lower limit breached: currentTau = {}, limit = {}", joint, currentTau[i][0], tauLimitLow);
+    }
   }
 }
 

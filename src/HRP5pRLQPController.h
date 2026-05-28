@@ -80,6 +80,7 @@ private:
   bool byPassQPControl(); 
   void updateExternalTorque();
   void computeLimits();
+  bool printLimits_ = true;
 
   Eigen::VectorXd externalTorques_;
 
@@ -120,9 +121,10 @@ private:
   Eigen::VectorXd alpha;
   Eigen::VectorXd alpha_real;
 
-  std::map<std::string, double> q0_map_;
+  std::map<std::string, double> q0_map_; // Used to create the mc_rtc to RL framework joint mapping
 
   bool computeExternalTorque_ = false;
+  bool computeExternalTorqueHasChanged_ = false;
 
   bool contactModeChanged_ = true;
   bool contactConstraintsAreEnabled_ = true;
