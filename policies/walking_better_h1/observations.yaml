@@ -1,0 +1,29 @@
+training_convention: mjlab
+
+observations:
+  - type: base_ang_vel
+    history: 3
+
+  - type: base_lin_vel
+    history: 3
+
+  - type: joint_pos_rel
+    history: 3
+    parameters:
+      joints: legs
+
+  - type: joint_vel_rel
+    history: 3
+    parameters:
+      joints: legs
+
+  - type: last_action
+    history: 3
+
+  - type: phase
+    history: 1
+
+  - type: generated_commands
+    history: 1
+    parameters:
+      size: 3

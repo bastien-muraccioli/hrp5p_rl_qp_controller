@@ -17,7 +17,8 @@ robots:
   ground:
     module: env/ground
 
-  base_body: base_link
+robot:
+  base_body: pelvis
   observation_source: realRobot
 
 collisions:
@@ -41,4 +42,4 @@ init: NewRLQPController_Initial
 policies_root: policies
 
 
-default_policy: policyName1
+default_policy: walking_better_h1

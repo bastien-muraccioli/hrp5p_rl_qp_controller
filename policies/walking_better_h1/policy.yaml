@@ -1,0 +1,55 @@
+name: walking_better_h1
+
+onnx: walking_better_h1.onnx
+
+control:
+  use_QP: true
+  policy_step_size: 0.01
+  physics_step_size: 0.001
+  kp_scale: 1.0
+  kd_scale: 1.0
+
+action:
+  joints: legs
+  scale: 1.0
+
+kp:
+  left_hip_yaw_joint: 200.0
+  left_hip_roll_joint: 200.0
+  left_hip_pitch_joint: 200.0
+  left_knee_joint: 300.0
+  left_ankle_joint: 40.0
+  right_hip_yaw_joint: 200.0
+  right_hip_roll_joint: 200.0
+  right_hip_pitch_joint: 200.0
+  right_knee_joint: 300.0
+  right_ankle_joint: 40.0
+  torso_joint: 100.0
+  left_shoulder_pitch_joint: 100.0
+  left_shoulder_roll_joint: 100.0
+  left_shoulder_yaw_joint: 100.0
+  left_elbow_joint: 100.0
+  right_shoulder_pitch_joint: 100.0
+  right_shoulder_roll_joint: 100.0
+  right_shoulder_yaw_joint: 100.0
+  right_elbow_joint: 100.0
+kd:
+  left_hip_yaw_joint: 5.0
+  left_hip_roll_joint: 5.0
+  left_hip_pitch_joint: 5.0
+  left_knee_joint: 6.0
+  left_ankle_joint: 2.0
+  right_hip_yaw_joint: 5.0
+  right_hip_roll_joint: 5.0
+  right_hip_pitch_joint: 5.0
+  right_knee_joint: 6.0
+  right_ankle_joint: 2.0
+  torso_joint: 10.0
+  left_shoulder_pitch_joint: 5.0
+  left_shoulder_roll_joint: 5.0
+  left_shoulder_yaw_joint: 5.0
+  left_elbow_joint: 5.0
+  right_shoulder_pitch_joint: 5.0
+  right_shoulder_roll_joint: 5.0
+  right_shoulder_yaw_joint: 5.0
+  right_elbow_joint: 5.0

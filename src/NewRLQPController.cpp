@@ -12,6 +12,7 @@ NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm,
                                      const mc_rtc::Configuration & config)
 : mc_control::fsm::Controller(rm, dt, config, Backend::TVM)
 {
+  mc_rtc::log::error("[NewRLQPController] constructor entered");
   config_ = config;
 
   //Initialize Constraints

@@ -201,11 +201,16 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   pdGainsRatio_ = policy.kpScale;
 
   phasePeriod_ = policy.rawObservations("phase_period", 1.0);
+  
   if(policy.rawPolicy.has("control"))
   {
-    phasePeriod_ = policy.rawPolicy("control")("phase_period", phasePeriod_);
-  }
+    const mc_rtc::Configuration control = policy.rawPolicy("control");
 
+    if(control.has("phase_period"))
+    {
+      control("phase_period", phasePeriod_);
+    }
+  }
   if(phasePeriod_ <= 0.0)
   {
     mc_rtc::log::error_and_throw(
