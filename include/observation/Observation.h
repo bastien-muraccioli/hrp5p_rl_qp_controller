@@ -57,15 +57,24 @@ struct ObservationConvention
   /** @brief Resolve an external YAML type to an internal registered observation type. */
   std::string resolveType(const std::string & requestedType) const;
 
+  /** @brief Named mc_rtc joint groups (all, legs, arms, ...) for cross-convention subset resolution. */
+  std::map<std::string, std::vector<std::string> > mcRtcJointGroups;
+
   /**
-   * @brief Resolve an observation joint selector to explicit joint names.
+   * @brief Resolve an observation joint selector to controller joint indices.
    *
    * The joints parameter may be absent, a joint-group name, or an explicit
-   * list. If absent, the fallback is used. In this controller, the fallback is
-   * normally the policy action joint list.
+   * list of names.
+   * - Absent: returns fallbackIndices.
+   * - Group name: checked first in AI convention groups, then in mcRtcJointGroups;
+   *   mc_rtc subsets are returned in AI convention "all" order.
+   * - Explicit list of names: mapped directly to controller indices.
+   *
+   * All returned indices are positions in controllerJointOrder.
    */
-  std::vector<std::string> resolveJoints(const mc_rtc::Configuration & parameters,
-                                         const std::vector<std::string> & fallback) const;
+  std::vector<int> resolveJointControllerIndices(const mc_rtc::Configuration & parameters,
+                                                 const std::vector<std::string> & controllerJointOrder,
+                                                 const std::vector<int> & fallbackIndices) const;
 
   /**
    * @brief Resolve final parameters for one observation.
@@ -89,9 +98,10 @@ struct ObservationConvention
  *
  * Joint-order convention:
  * - controllerJointOrder is mc_rtc's robot().refJointOrder().
- * - policyJointOrder is policy.yaml/action/joints.
+ * - policyJointControllerIndices maps action index i to controllerJointOrder index,
+ *   i.e. the policy joints in AI convention order expressed as controller indices.
  * - qZeroControllerOrder is stored in controllerJointOrder.
- * - lastActionPolicyOrder is stored in policyJointOrder.
+ * - lastActionPolicyOrder is stored in policyJointOrder (AI/policy order).
  */
 struct ObservationContext
 {
@@ -101,11 +111,15 @@ struct ObservationContext
   /** @brief Robot base body used by base velocity and projected gravity observations. */
   std::string baseBody;
 
-  /** @brief mc_rtc controller order: robot().refJointOrder(). */
+  /** @brief mc_rtc controller order: robot().refJointOrder(). Used at configure time only. */
   const std::vector<std::string> & controllerJointOrder;
 
-  /** @brief Policy action order from policy.yaml/action/joints. */
-  const std::vector<std::string> & policyJointOrder;
+  /** @brief Policy joints as controller indices in AI convention order.
+   *
+   * policyJointControllerIndices[i] is the index in controllerJointOrder of the
+   * i-th joint in the RL env convention action/observation order.
+   */
+  const std::vector<int> & policyJointControllerIndices;
 
   /** @brief Default pose expanded in controllerJointOrder. */
   const Eigen::VectorXd & qZeroControllerOrder;
@@ -201,10 +215,6 @@ protected:
     parameters(key, value);
     return value;
   }
-
-  /** @brief Convert joint names to indices in ObservationContext::controllerJointOrder. */
-  std::vector<int> resolveControllerJointIndices(const ObservationContext & context,
-                                                 const std::vector<std::string> & joints) const;
 
   /** @brief Read a scalar or vector scale parameter. */
   Eigen::VectorXd readScaleVector(const mc_rtc::Configuration & parameters,

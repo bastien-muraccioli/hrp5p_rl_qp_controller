@@ -27,29 +27,31 @@ void JointPosObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<std::string> joints =
-    context.convention.resolveJoints(parameters, context.policyJointOrder);
+  const std::vector<int> controllerIndices =
+    context.convention.resolveJointControllerIndices(parameters, context.controllerJointOrder,
+                                                     context.policyJointControllerIndices);
 
-  indices_ = resolveControllerJointIndices(context, joints);
-  relativeToDefaultPose_ = readParameter<bool>(parameters, "relative_to_default_pose", true);
-  scale_ = readScaleVector(parameters, "scale", static_cast<int>(indices_.size()), 1.0);
+  const int n = static_cast<int>(controllerIndices.size());
+  mbcIndices_.resize(static_cast<size_t>(n));
+  defaultPose_ = Eigen::VectorXd::Zero(n);
 
-  defaultPose_ = Eigen::VectorXd::Zero(static_cast<int>(indices_.size()));
-
-  for(size_t i = 0; i < indices_.size(); ++i)
+  for(int i = 0; i < n; ++i)
   {
-    defaultPose_(static_cast<int>(i)) = context.qZeroControllerOrder(indices_[i]);
+    const int ctrlIdx = controllerIndices[static_cast<size_t>(i)];
+    const std::string & jointName = context.controllerJointOrder[static_cast<size_t>(ctrlIdx)];
+    mbcIndices_[static_cast<size_t>(i)] = context.observationRobot.jointIndexByName(jointName);
+    defaultPose_(i) = context.qZeroControllerOrder(ctrlIdx);
   }
+
+  relativeToDefaultPose_ = readParameter<bool>(parameters, "relative_to_default_pose", true);
+  scale_ = readScaleVector(parameters, "scale", n, 1.0);
 }
 
 void JointPosObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  for(size_t i = 0; i < indices_.size(); ++i)
+  for(size_t i = 0; i < mbcIndices_.size(); ++i)
   {
-    const std::string & joint = context.controllerJointOrder[static_cast<size_t>(indices_[i])];
-    const int mbcIndex = context.observationRobot.jointIndexByName(joint);
-
-    double value = context.observationRobot.mbc().q[static_cast<size_t>(mbcIndex)][0];
+    double value = context.observationRobot.mbc().q[static_cast<size_t>(mbcIndices_[i])][0];
 
     if(relativeToDefaultPose_)
     {
@@ -75,24 +77,30 @@ void JointVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<std::string> joints =
-    context.convention.resolveJoints(parameters, context.policyJointOrder);
+  const std::vector<int> controllerIndices =
+    context.convention.resolveJointControllerIndices(parameters, context.controllerJointOrder,
+                                                     context.policyJointControllerIndices);
 
-  indices_ = resolveControllerJointIndices(context, joints);
+  const int n = static_cast<int>(controllerIndices.size());
+  mbcIndices_.resize(static_cast<size_t>(n));
+  defaultVelocity_ = Eigen::VectorXd::Zero(n);
+
+  for(int i = 0; i < n; ++i)
+  {
+    const int ctrlIdx = controllerIndices[static_cast<size_t>(i)];
+    const std::string & jointName = context.controllerJointOrder[static_cast<size_t>(ctrlIdx)];
+    mbcIndices_[static_cast<size_t>(i)] = context.observationRobot.jointIndexByName(jointName);
+  }
+
   relativeToDefaultVelocity_ = readParameter<bool>(parameters, "relative_to_default_velocity", true);
-  scale_ = readScaleVector(parameters, "scale", static_cast<int>(indices_.size()), 1.0);
-
-  defaultVelocity_ = Eigen::VectorXd::Zero(static_cast<int>(indices_.size()));
+  scale_ = readScaleVector(parameters, "scale", n, 1.0);
 }
 
 void JointVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  for(size_t i = 0; i < indices_.size(); ++i)
+  for(size_t i = 0; i < mbcIndices_.size(); ++i)
   {
-    const std::string & joint = context.controllerJointOrder[static_cast<size_t>(indices_[i])];
-    const int mbcIndex = context.observationRobot.jointIndexByName(joint);
-
-    double value = context.observationRobot.mbc().alpha[static_cast<size_t>(mbcIndex)][0];
+    double value = context.observationRobot.mbc().alpha[static_cast<size_t>(mbcIndices_[i])][0];
 
     if(relativeToDefaultVelocity_)
     {

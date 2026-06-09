@@ -3,6 +3,7 @@
 #include "ConfigurationHelpers.h"
 
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 #include <mc_rtc/logging.h>
@@ -12,21 +13,6 @@ namespace rlqp
 
 namespace
 {
-
-int controllerJointIndex(const std::vector<std::string> & controllerJointOrder,
-                         const std::string & jointName)
-{
-  std::vector<std::string>::const_iterator it =
-    std::find(controllerJointOrder.begin(), controllerJointOrder.end(), jointName);
-
-  if(it == controllerJointOrder.end())
-  {
-    return -1;
-  }
-
-  return static_cast<int>(std::distance(controllerJointOrder.begin(), it));
-}
-
 std::string joinStrings(const std::vector<std::string> & values)
 {
   std::ostringstream os;
@@ -88,6 +74,21 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
     }
   }
 
+  // Load mc_rtc joint groups for cross-convention subset resolution
+  if(conventions.has("mc_rtc"))
+  {
+    mc_rtc::Configuration mcRtcCfg = conventions("mc_rtc");
+    if(mcRtcCfg.has("joint_groups"))
+    {
+      mc_rtc::Configuration mcGroups = mcRtcCfg("joint_groups");
+      std::vector<std::string> mcKeys = mcGroups.keys();
+      for(size_t i = 0; i < mcKeys.size(); ++i)
+      {
+        out.mcRtcJointGroups[mcKeys[i]] = mcGroups(mcKeys[i], std::vector<std::string>());
+      }
+    }
+  }
+
   if(cfg.has("observation_defaults"))
   {
     mc_rtc::Configuration defaults = cfg("observation_defaults");
@@ -127,23 +128,75 @@ std::string ObservationConvention::resolveType(const std::string & requestedType
   return it->second;
 }
 
-std::vector<std::string> ObservationConvention::resolveJoints(const mc_rtc::Configuration & parameters,
-                                                              const std::vector<std::string> & fallback) const
+std::vector<int> ObservationConvention::resolveJointControllerIndices(
+  const mc_rtc::Configuration & parameters,
+  const std::vector<std::string> & controllerJointOrder,
+  const std::vector<int> & fallbackIndices) const
 {
   if(!parameters.has("joints"))
   {
-    return fallback;
+    return fallbackIndices;
   }
 
+  // Helper: map a joint name to its index in controllerJointOrder
+  auto nameToIdx = [&](const std::string & name) -> int
+  {
+    std::vector<std::string>::const_iterator it =
+      std::find(controllerJointOrder.begin(), controllerJointOrder.end(), name);
+    if(it == controllerJointOrder.end())
+    {
+      mc_rtc::log::error_and_throw(
+        "[ObservationConvention] Joint '{}' not found in controllerJointOrder", name);
+    }
+    return static_cast<int>(std::distance(controllerJointOrder.begin(), it));
+  };
+
+  // Try to parse as a group name (string)
   try
   {
     const std::string groupName = parameters("joints", std::string(""));
     if(!groupName.empty())
     {
-      std::map<std::string, std::vector<std::string> >::const_iterator groupIt = jointGroups.find(groupName);
-      if(groupIt != jointGroups.end())
+      // Check RL convention groups (e.g. mjlab.joint_groups.all)
+      std::map<std::string, std::vector<std::string> >::const_iterator rlIt =
+        jointGroups.find(groupName);
+      if(rlIt != jointGroups.end())
       {
-        return groupIt->second;
+        std::vector<int> out;
+        out.reserve(rlIt->second.size());
+        for(size_t i = 0; i < rlIt->second.size(); ++i)
+        {
+          out.push_back(nameToIdx(rlIt->second[i]));
+        }
+        return out;
+      }
+
+      // Check mc_rtc groups (e.g. mc_rtc.joint_groups.legs);
+      //    return joints filtered to those in the subset, in RL convention "all" order
+      std::map<std::string, std::vector<std::string> >::const_iterator mcIt =
+        mcRtcJointGroups.find(groupName);
+      if(mcIt != mcRtcJointGroups.end())
+      {
+        const std::vector<std::string> & mcJoints = mcIt->second;
+        std::set<std::string> requested(mcJoints.begin(), mcJoints.end());
+
+        std::vector<int> out;
+        std::map<std::string, std::vector<std::string> >::const_iterator allIt =
+          jointGroups.find("all");
+        if(allIt != jointGroups.end())
+        {
+          for(size_t i = 0; i < allIt->second.size(); ++i)
+          {
+            if(requested.count(allIt->second[i]))
+            {
+              out.push_back(nameToIdx(allIt->second[i]));
+            }
+          }
+        }
+        if(!out.empty())
+        {
+          return out;
+        }
       }
     }
   }
@@ -151,7 +204,26 @@ std::vector<std::string> ObservationConvention::resolveJoints(const mc_rtc::Conf
   {
   }
 
-  return parameters("joints", fallback);
+  // Try to parse as an explicit list of joint names
+  try
+  {
+    const std::vector<std::string> names = parameters("joints", std::vector<std::string>());
+    if(!names.empty())
+    {
+      std::vector<int> out;
+      out.reserve(names.size());
+      for(size_t i = 0; i < names.size(); ++i)
+      {
+        out.push_back(nameToIdx(names[i]));
+      }
+      return out;
+    }
+  }
+  catch(...)
+  {
+  }
+
+  return fallbackIndices;
 }
 
 mc_rtc::Configuration ObservationConvention::resolveObservationParameters(
@@ -196,41 +268,6 @@ Observation::Observation(const ObservationConfig & config, const ObservationConv
 
 Observation::~Observation()
 {
-}
-
-std::vector<int> Observation::resolveControllerJointIndices(const ObservationContext & context,
-                                                            const std::vector<std::string> & joints) const
-{
-  std::vector<int> indices;
-  indices.reserve(joints.size());
-
-  for(size_t i = 0; i < joints.size(); ++i)
-  {
-    const std::string & joint = joints[i];
-
-    if(!context.observationRobot.hasJoint(joint))
-    {
-      mc_rtc::log::error_and_throw(
-        "[Observation:{}] Requested joint '{}' does not exist on robot '{}'",
-        name(),
-        joint,
-        context.observationRobot.name());
-    }
-
-    const int index = controllerJointIndex(context.controllerJointOrder, joint);
-
-    if(index < 0)
-    {
-      mc_rtc::log::error_and_throw(
-        "[Observation:{}] Joint '{}' is not in controllerJointOrder",
-        name(),
-        joint);
-    }
-
-    indices.push_back(index);
-  }
-
-  return indices;
 }
 
 Eigen::VectorXd Observation::readScaleVector(const mc_rtc::Configuration & parameters,
