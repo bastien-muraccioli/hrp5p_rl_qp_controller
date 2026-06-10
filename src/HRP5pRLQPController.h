@@ -3,6 +3,7 @@
 #include <mc_control/fsm/Controller.h>
 #include <mc_tasks/TorqueJointTask.h>
 #include <SpaceVecAlg/EigenTypedef.h>
+#include <SpaceVecAlg/SpaceVecAlg>
 
 #include "api.h"
 
@@ -23,6 +24,7 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   void activateQPControl(bool activate);
   void activateTorqueControl(bool activate);
   void activateContactConstraints(bool activate);
+  void activateExternalTorqueComputation(bool activate);
   void initializeRLObservation();
 
   // Task
@@ -78,7 +80,6 @@ private:
   bool manageModeSwitching();
   // Directly use RL output without QP modifications (Torque Control only) 
   bool byPassQPControl(); 
-  void updateExternalTorque();
   void computeLimits();
   bool printLimits_ = true;
 
@@ -93,7 +94,7 @@ private:
 
   // Constraint configuration
   double velPercent_ = 0.99; // Percentage of the max velocity taking account in the joint velocity constraint.
-  double dsPercent_ = 0.0; // Percentage of the max joint range taking account in the joint position limit constraint.
+  double dsPercent_ = 0.01; // Percentage of the max joint range taking account in the joint position limit constraint.
   double diPercent_ = 0.1; // Doesn't matter since di > ds. This variable is not used in the constraint dynamics.
 
   // CBF Gains More details are explained in the paper cf. Readme.md. 
@@ -116,15 +117,10 @@ private:
   std::vector<std::string> policyPaths_;
   Eigen::VectorXd tau_rl_;
 
-  Eigen::VectorXd q;
-  Eigen::VectorXd q_real;
-  Eigen::VectorXd alpha;
-  Eigen::VectorXd alpha_real;
+  sva::PTransformd controlFloatingBase_;
+  sva::PTransformd realFloatingBase_;
 
   std::map<std::string, double> q0_map_; // Used to create the mc_rtc to RL framework joint mapping
-
-  bool computeExternalTorque_ = false;
-  bool computeExternalTorqueHasChanged_ = false;
 
   bool contactModeChanged_ = true;
   bool contactConstraintsAreEnabled_ = true;

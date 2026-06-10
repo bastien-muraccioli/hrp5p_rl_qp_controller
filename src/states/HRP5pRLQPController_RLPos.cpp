@@ -9,7 +9,8 @@ void HRP5pRLQPController_RLPos::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.activateQPControl(true);
   ctl.activateTorqueControl(false);
-  ctl.activateContactConstraints(true);
+  ctl.activateContactConstraints(false);
+  ctl.activateExternalTorqueComputation(true);
   ctl.solver().addTask(ctl.torqueJointTask);
   ctl.setHighPDGains(false); // Use RL gains
   ctl.utilsClass.start_rl_state(ctl, "RL_State");
@@ -26,8 +27,8 @@ bool HRP5pRLQPController_RLPos::run(mc_control::fsm::Controller & ctl_)
 void HRP5pRLQPController_RLPos::teardown(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
-  ctl.utilsClass.teardown_rl_state(ctl);
   ctl.solver().removeTask(ctl.torqueJointTask);
+  ctl.activateExternalTorqueComputation(false);
 }
 
 EXPORT_SINGLE_STATE("HRP5pRLQPController_RLPos", HRP5pRLQPController_RLPos)

@@ -1,12 +1,14 @@
 #include "HRP5pRLQPController.h"
 #include <mc_rtc/gui/ArrayInput.h>
 #include <mc_rtc/gui/Force.h>
+#include <mc_rtc/gui/Transform.h>
 
 #include <RBDyn/MultiBodyConfig.h>
 #include <SpaceVecAlg/EigenTypedef.h>
 #include <Eigen/src/Core/Matrix.h>
 #include <cmath>
 #include <vector>
+
 
 HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config)
 : mc_control::fsm::Controller(rm, dt, config, Backend::TVM)
@@ -29,15 +31,10 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
   initializeRobot();
   initializeRLPolicy();
 
-  const auto & q_mbc     = robot().q();
-  const auto & q_dot_mbc = robot().alpha();
-  auto & real_robot = realRobot(robot().name());
-  const auto & q_real_mbc     = real_robot.q();
-  const auto & qdot_real_mbc = real_robot.alpha();
-  q = rbd::sParamToVector(robot().mb(), q_mbc);
-  alpha = rbd::sDofToVector(robot().mb(), q_dot_mbc);
-  q_real = rbd::sParamToVector(real_robot.mb(), q_real_mbc);
-  alpha_real = rbd::sDofToVector(real_robot.mb(), qdot_real_mbc);
+  auto & robot = robots()[0];
+  auto & real_robot = realRobot(robot.name());
+  controlFloatingBase_ = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
+  realFloatingBase_ = real_robot.mbc().bodyPosW[real_robot.mb().bodyIndexByName("Body")];
 
   addGui();
   addLog();
@@ -46,15 +43,10 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
 
 bool HRP5pRLQPController::run()
 {
-  auto & q_mbc     = robot().q();
-  auto & qdot_mbc = robot().alpha();
-  auto & real_robot = realRobot(robot().name());
-  auto & q_real_mbc     = real_robot.q();
-  auto & qdot_real_mbc = real_robot.alpha();
-  q = rbd::sParamToVector(robot().mb(), q_mbc);
-  alpha = rbd::sDofToVector(robot().mb(), qdot_mbc);
-  q_real = rbd::sParamToVector(real_robot.mb(), q_real_mbc);
-  alpha_real = rbd::sDofToVector(real_robot.mb(), qdot_real_mbc);
+  auto & robot = robots()[0];
+  auto & real_robot = realRobot(robot.name());
+  controlFloatingBase_ = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
+  realFloatingBase_ = real_robot.mbc().bodyPosW[real_robot.mb().bodyIndexByName("Body")];
 
   if(printLimits_) computeLimits();
 
@@ -62,10 +54,11 @@ bool HRP5pRLQPController::run()
   {
     if(contactConstraintsAreEnabled_)
     {
-      Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
-      // Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Zero();
-      addContact({robot().name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
-      addContact({robot().name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
+      // Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
+      Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Zero();
+      footcontact_dof.head<3>() = Eigen::Vector3d::Ones(); // Only enforce the position constraint for the foot contact
+      addContact({robot.name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
+      addContact({robot.name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
     }
     else
     {
@@ -282,6 +275,7 @@ bool HRP5pRLQPController::byPassQPControl()
   int i = 0;
   for(const auto &joint_name : jointNames)
   {
+      if(!robot().hasJoint(joint_name)) { ++i; continue; }
       const double q = q_mbc[robot().jointIndexByName(joint_name)][0];
       const double q_dot = q_dot_mbc[robot().jointIndexByName(joint_name)][0];
       tau_rl_(i) = kp_(i) * (q_rl(i) - q) - kd_(i) * q_dot;
@@ -335,10 +329,8 @@ void HRP5pRLQPController::addLog()
     logger().addLogEntry("HRP5pRLQPController_obs_footContactForces_" + std::to_string(i), [this, i]() { return footContactForces[i]; });
   }
 
-  logger().addLogEntry("HRP5pRLQPController_q", [this]() { return q; });
-  logger().addLogEntry("HRP5pRLQPController_real_q", [this]() { return q_real; });
-  logger().addLogEntry("HRP5pRLQPController_alpha", [this]() { return alpha; });
-  logger().addLogEntry("HRP5pRLQPController_real_alpha", [this]() { return alpha_real; });
+  logger().addLogEntry("HRP5pRLQPController_controlFloatingBase", [this]() { return controlFloatingBase_; });
+  logger().addLogEntry("HRP5pRLQPController_realFloatingBase", [this]() { return realFloatingBase_; });
 }
 
 void HRP5pRLQPController::addGui()
@@ -347,7 +339,21 @@ void HRP5pRLQPController::addGui()
   mc_rtc::gui::Label("Current policy", [this]() -> const std::string & 
     { 
       return policyPaths_[currentPolicyIndex]; 
+    }),
+    mc_rtc::gui::Label("Policy Loaded", [this]() { 
+      return rlPolicy->isLoaded() ? "Yes" : "No"; 
+    }),
+    mc_rtc::gui::Label("Observation Size", [this]() { 
+      return std::to_string(rlPolicy->getObservationSize()); 
+    }),
+    mc_rtc::gui::Label("Action Size", [this]() { 
+      return std::to_string(rlPolicy->getActionSize()); 
     })
+  );
+
+  gui()->addElement({"HRP5pRLQPController", "Visual"},
+    mc_rtc::gui::Transform("Control Floating Base", [this]() { return controlFloatingBase_; }),
+    mc_rtc::gui::Transform("Real Floating Base", [this]() { return realFloatingBase_; })
   );
 
   // Add PD gains ratio slider
@@ -383,14 +389,6 @@ void HRP5pRLQPController::addGui()
       {
         return useQP_ ? "Enforced" : "Bypassed";
       }),
-      mc_rtc::gui::Button("Toggle External Torque", [this]()
-        {
-          computeExternalTorque_ = !computeExternalTorque_;
-        }),
-      mc_rtc::gui::Label("External Torque", [this]()
-        {
-          return computeExternalTorque_ ? "Enabled" : "Disabled";
-        }),
        mc_rtc::gui::Button("Toggle Contact constraint", [this]()
         {
           contactConstraintsAreEnabled_ = !contactConstraintsAreEnabled_;
@@ -520,11 +518,7 @@ bool HRP5pRLQPController::manageModeSwitching()
       datastore().assign<std::string>("ControlMode", "Position");
     }
     controlModeChanged_ = false;
-  }
-
-
-  updateExternalTorque();
-  
+  }  
 
   if(isTorqueControl_)
   {
@@ -534,63 +528,6 @@ bool HRP5pRLQPController::manageModeSwitching()
   else 
   {
     return mc_control::fsm::Controller::run();
-  }
-}
-
-void HRP5pRLQPController::updateExternalTorque()
-{
-  auto & robot = robots()[0];
-  auto & real_robot = realRobot(robots()[0].name());
-
-  // Reset each cycle — never accumulate across control iterations
-  externalTorques_ = Eigen::VectorXd::Zero(real_robot.mb().nrDof());
-
-  for(const auto & ft_sensor : real_robot.forceSensors())
-  {
-    // Transformation from parent body origin to sensor frame, used to place
-    // the Jacobian at the exact sensor location rather than the body origin,
-    // ensuring the moment arm is correct
-    const sva::PTransformd & X_p_f = ft_sensor.X_p_f();
-    auto jac = rbd::Jacobian(real_robot.mb(), ft_sensor.parentBody(), X_p_f.translation());
-
-    // World-frame Jacobian (6 x path_dof), then expanded to full robot DoF
-    // so J^T maps a world-frame wrench to all joint torques
-    Eigen::MatrixXd shortJac = jac.jacobian(real_robot.mb(), real_robot.mbc());
-    Eigen::MatrixXd fullJac = Eigen::MatrixXd::Zero(6, real_robot.mb().nrDof());
-    jac.fullJacobian(real_robot.mb(), shortJac, fullJac);
-
-    // wrenchWithoutGravity returns the wrench in the sensor (body) frame.
-    // R.transpose() rotates it to the world frame to match the world-frame
-    // Jacobian — virtual work requires both to be expressed in the same frame
-    const Eigen::Matrix3d & R = real_robot.bodyPosW(ft_sensor.parentBody()).rotation();
-    sva::ForceVecd w = ft_sensor.wrenchWithoutGravity(real_robot);
-    w.force() = R.transpose() * w.force();
-    w.couple() = R.transpose() * w.couple();
-
-    // τ_ext += J^T * F: project the external wrench into joint torque space
-    // and accumulate contributions from all sensors
-    externalTorques_ += fullJac.transpose() * w.vector();
-  }
-
-  externalTorques_ -= dynamicsConstraint->dynamicFunction().contactTorque();
-
-  if(computeExternalTorque_ && !computeExternalTorqueHasChanged_)
-  {
-    mc_rtc::log::info("[HRP5pRLQPController] External torque computation enabled");
-    computeExternalTorqueHasChanged_ = computeExternalTorque_;
-  }
-  else if(!computeExternalTorque_ && computeExternalTorqueHasChanged_)
-  {
-    mc_rtc::log::info("[HRP5pRLQPController] External torque computation disabled");
-    computeExternalTorqueHasChanged_ = computeExternalTorque_;
-    robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
-    real_robot.setExternalTorques(Eigen::VectorXd::Zero(real_robot.mb().nrDof()));
-  }
-
-  if(computeExternalTorque_)
-  {
-    robot.setExternalTorques(externalTorques_);
-    real_robot.setExternalTorques(externalTorques_);
   }
 }
 
@@ -628,7 +565,13 @@ void HRP5pRLQPController::computeLimits()
 
   for (std::string joint : robot().refJointOrder())
   {
+    // Skip joints not present in the multibody chain (e.g. finger joints)
+    if(!robot().hasJoint(joint)) { continue; }
+
     int i = robot().jointIndexByName(joint);
+
+    // Skip fixed joints or multi-dof joints (no scalar limits)
+    if(qLimLower[i].empty() || qLimUpper[i].empty()) { continue; }
 
     const double ds = dsPercent_ * (qLimUpper[i][0] - qLimLower[i][0]);
     const double posLimitUp = qLimUpper[i][0] - ds;
@@ -702,5 +645,12 @@ void HRP5pRLQPController::activateQPControl(bool activate)
   else if(!activate && useQP_)
   {
     useQP_ = false;
+  }
+}
+
+void HRP5pRLQPController::activateExternalTorqueComputation(bool activate)
+{
+  if (activate != datastore().call<bool>("EF_Estimator::isActive")) {
+    datastore().call("EF_Estimator::toggleActive");
   }
 }

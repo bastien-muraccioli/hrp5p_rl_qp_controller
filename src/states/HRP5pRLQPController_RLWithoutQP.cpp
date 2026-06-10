@@ -26,7 +26,6 @@ bool HRP5pRLQPController_RLWithoutQP::run(mc_control::fsm::Controller & ctl_)
 void HRP5pRLQPController_RLWithoutQP::teardown(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
-  ctl.utilsClass.teardown_rl_state(ctl);
   ctl.solver().removeTask(ctl.torqueJointTask);
 }
 
