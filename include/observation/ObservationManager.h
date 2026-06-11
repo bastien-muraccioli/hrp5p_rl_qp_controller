@@ -54,8 +54,7 @@ private:
   };
 
 private:
-  ObservationConfig parseObservationConfig(const mc_rtc::Configuration & config,
-                                           int defaultHistory) const;
+  ObservationConfig parseObservationConfig(const mc_rtc::Configuration & config) const;
 
   Eigen::VectorXd flattenHistory(const Entry & entry) const;
 

@@ -26,7 +26,6 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
   entries_.clear();
   size_ = 0;
 
-  const int defaultHistory = observationsConfig("history", 1);
   const std::string conventionName = observationsConfig("training_convention", std::string("mjlab"));
 
   convention_ = ObservationConvention::fromConfig(controllerConfig, conventionName);
@@ -40,7 +39,7 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
 
   for(size_t i = 0; i < observations.size(); ++i)
   {
-    ObservationConfig config = parseObservationConfig(observations[i], defaultHistory);
+    ObservationConfig config = parseObservationConfig(observations[i]);
     config.type = convention_.resolveType(config.requestedType);
 
     Entry entry;
@@ -129,8 +128,7 @@ int ObservationManager::size() const { return size_; }
 
 const std::string & ObservationManager::conventionName() const { return convention_.name; }
 
-ObservationConfig ObservationManager::parseObservationConfig(const mc_rtc::Configuration & config,
-                                                            int defaultHistory) const
+ObservationConfig ObservationManager::parseObservationConfig(const mc_rtc::Configuration & config) const
 {
   ObservationConfig out;
 
@@ -145,8 +143,7 @@ ObservationConfig ObservationManager::parseObservationConfig(const mc_rtc::Confi
   out.name = out.requestedType;
   config("name", out.name);
 
-  out.history = defaultHistory;
-  config("history", out.history);
+  out.history = config("parameters")("history", 1);
 
   if(out.history <= 0)
   {

@@ -39,8 +39,6 @@ NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm,
 
 bool NewRLQPController::run()
 {
-  auto test = realRobot(robots()[0].name()).encoderValues();
-  // mc_rtc::log::warning("realRobot: {}",test);
   if(printLimits_) computeLimits();
   bool run = mc_control::fsm::Controller::run(
           mc_solver::FeedbackType::ClosedLoopIntegrateReal);
