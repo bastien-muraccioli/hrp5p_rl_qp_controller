@@ -72,7 +72,7 @@ public:
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
 
 private:
-  int bodyIndex_ = -1;
+  std::string sensorName_ = "Accelerometer";
   Eigen::VectorXd scale_;
 };
 
@@ -87,7 +87,7 @@ public:
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
 
 private:
-  int bodyIndex_ = -1;
+  std::string sensorName_ = "Accelerometer";
   Eigen::VectorXd scale_;
 };
 
@@ -136,11 +136,12 @@ public:
   BaseOrientationObservation(const ObservationConfig & config, const ObservationConvention & convention);
 
   void configure(const ObservationContext & context) override;
-  int size() const override { return 3; }
+  int size() const override { return indexes_.size(); }
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
 
 private:
   std::string sensorName_ = "Accelerometer";
+  std::vector<int> indexes_ = {0,1,2};
   Eigen::VectorXd scale_;
 };
 

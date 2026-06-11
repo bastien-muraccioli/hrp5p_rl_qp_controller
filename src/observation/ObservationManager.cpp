@@ -83,7 +83,7 @@ void ObservationManager::updateHistory(const ObservationContext & context)
 
     for(int h = 0; h < entry.observation->history(); ++h)
     {
-      entry.historyBuffer.push_back(current);
+      entry.historyBuffer.push_front(current);
     }
   }
 }
@@ -178,16 +178,12 @@ Eigen::VectorXd ObservationManager::flattenHistory(const Entry & entry) const
   }
 
   Eigen::VectorXd out = Eigen::VectorXd::Zero(total);
-  int offset = 0;
-
-  for(std::deque<Eigen::VectorXd>::const_reverse_iterator it = entry.historyBuffer.rbegin();
-      it != entry.historyBuffer.rend();
-      ++it)
+  Eigen::Index offset = 0;
+  for(const auto & v : entry.historyBuffer)
   {
-    out.segment(offset, it->size()) = *it;
-    offset += static_cast<int>(it->size());
+    out.segment(offset, v.size()) = v;
+    offset += v.size();
   }
-
   return out;
 }
 

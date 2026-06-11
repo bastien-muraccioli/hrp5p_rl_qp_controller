@@ -125,13 +125,15 @@ private:
   /** @brief Log warnings when joint position/velocity/torque limits are exceeded. */
   void computeLimits();
 
+  std::pair<sva::PTransformd, Eigen::Vector3d>  createContactAnchor(const mc_rbdyn::Robot & anchorRobot);
+
 private:
   bool printLimits_ = true;
 
   std::string robotName_;
 
   // --- CBF-QP constraint parameters ---
-  double velPercent_ = 0.95; // Percentage of the max velocity taking account in the joint velocity constraint.
+  double velPercent_ = 0.9; // Percentage of the max velocity taking account in the joint velocity constraint.
   double dsPercent_ = 0.01; // Percentage of the max joint range taking account in the joint position limit constraint.
   double diPercent_ = 0.1; // Doesn't matter since di > ds. This variable is not used in the constraint dynamics.
 
@@ -139,9 +141,12 @@ private:
   // More details are explained in the paper cf. Readme.md. 
   // Must be tuned depending on the robot.
   double zeta_jointLimit_ = 1.2;
-  double lambda_jointLimit_ = 100.0; // Same gain for joint position limits and velocity limits.
+  double lambda_jointLimit_ = 200.0; // Same gain for joint position limits and velocity limits.
   double zeta_selfCollision_ = 1.2;
-  double lambda_selfCollision_ = 10.0;
+  double lambda_selfCollision_ = 200.0;
 
   rlqp::RLPolicyRuntime rlRuntime_;
+
+  // Anchor from for tilt estimation
+  sva::PTransformd contactAnchorTf_;
 };

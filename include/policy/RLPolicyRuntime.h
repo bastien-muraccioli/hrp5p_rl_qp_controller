@@ -155,11 +155,13 @@ private:
   Eigen::Vector3d command_ = Eigen::Vector3d::Zero();
 
   bool useQP_ = true;
-  double policyStepSize_ = 0.01;
+  double policyStepSize_ = 0.02;
   double policyTimer_ = 0.0;
+
   double phasePeriod_ = 1.0;
   double phaseElapsedTime_ = 0.0;
   double phaseNormalized_ = 0.0;
+
   double pdGainsRatio_ = 1.0;
 };
 

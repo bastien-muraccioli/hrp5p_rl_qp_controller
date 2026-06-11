@@ -82,6 +82,8 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
   if(policyTimer_ < policyStepSize_) { return; }
 
   currentObservation_ = computeObservation(ctl);
+  for (int i = 0; i < currentObservation_.size();i++)
+    // mc_rtc::log::error("{} : {}", i, currentObservation_(i));
 
   if(currentObservation_.size() != policy_->getObservationSize())
   {
@@ -220,15 +222,6 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
       phasePeriod_);
   }
 
-  if(policy.physicsStepSize - ctl.timeStep > 1e-6)
-  {
-    mc_rtc::log::warning(
-      "[RLPolicyRuntime:{}] physics_step_size ({}) is larger than controller timestep ({}).",
-      policy.name,
-      policy.physicsStepSize,
-      ctl.timeStep);
-  }
-
   kpBase_.setZero();
   kdBase_.setZero();
 
@@ -291,10 +284,24 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     try { action("scale", scalarActionScale); } catch(...) {}
   }
 
+  //TODO stupid
   double scalarDefaultPosition = 0.0;
   if(action.has("default_position"))
   {
     try { action("default_position", scalarDefaultPosition); } catch(...) {}
+  }
+
+  size_t i = 0;
+  std::shared_ptr<mc_tasks::PostureTask> FSMPostureTask = ctl.getPostureTask(ctl.robot().name());
+  auto posture = FSMPostureTask->posture();
+  for (const auto& j : ctl.robot().mb().joints()) {
+    const std::string& joint_name = j.name();
+    if (j.type() == rbd::Joint::Type::Rev) {
+      if (const auto& t = posture[ctl.robot().jointIndexByName(joint_name)]; !t.empty()) {
+        q_zero_(i) =t[0];
+        i++;
+      }
+    }
   }
 
   for(size_t actionIndex = 0; actionIndex < actionToControllerMap_.size(); ++actionIndex)
@@ -316,14 +323,14 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     {
       actionScale_(dofIndex) = scaleIt->second;
     }
-
-    q_zero_(dofIndex) = scalarDefaultPosition;
+    
     std::map<std::string, double>::const_iterator defaultIt = policy.defaultPosition.find(joint);
     if(defaultIt != policy.defaultPosition.end())
     {
       q_zero_(dofIndex) = defaultIt->second;
     }
   }
+  mc_rtc::log::error(q_zero_);
 
   q_rl_ = q_zero_;
 }

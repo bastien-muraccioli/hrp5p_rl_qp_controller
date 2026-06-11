@@ -12,7 +12,6 @@ NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm,
                                      const mc_rtc::Configuration & config)
 : mc_control::fsm::Controller(rm, dt, config, Backend::TVM)
 {
-  mc_rtc::log::error("[NewRLQPController] constructor entered");
   config_ = config;
 
   //Initialize Constraints
@@ -40,6 +39,8 @@ NewRLQPController::NewRLQPController(mc_rbdyn::RobotModulePtr rm,
 
 bool NewRLQPController::run()
 {
+  auto test = realRobot(robots()[0].name()).encoderValues();
+  // mc_rtc::log::warning("realRobot: {}",test);
   if(printLimits_) computeLimits();
   bool run = mc_control::fsm::Controller::run(
           mc_solver::FeedbackType::ClosedLoopIntegrateReal);
@@ -81,6 +82,10 @@ void NewRLQPController::initializeRobotBasics()
   robotName_ = robot().name();
   jointNames = robot().refJointOrder();
   nbActuatedJoints = static_cast<int>(jointNames.size());
+  if(!datastore().has("anchorFrameFunction"))
+  {
+    datastore().make_call("anchorFrameFunction", [this](const mc_rbdyn::Robot & real_robot) {return createContactAnchor(real_robot);});
+  }
 }
 
 bool NewRLQPController::byPassQPControl()
@@ -280,4 +285,31 @@ void NewRLQPController::computeLimits()
         tauLimitLow);
     }
   }
+}
+
+std::pair<sva::PTransformd, Eigen::Vector3d> NewRLQPController::createContactAnchor(const mc_rbdyn::Robot & anchorRobot)
+{
+  sva::PTransformd X_foot_r = anchorRobot.bodyPosW("right_ankle_link");
+  sva::PTransformd X_foot_l = anchorRobot.bodyPosW("left_ankle_link");
+
+  sva::MotionVecd v_foot_r = anchorRobot.bodyVelW("right_ankle_link");
+  sva::MotionVecd v_foot_l = anchorRobot.bodyVelW("left_ankle_link");
+
+  int right_knee_index = int(robot().jointIndexByName("right_knee_joint")) + 5;
+  int left_knee_index = int(robot().jointIndexByName("left_knee_joint")) + 5;
+  double tau_ext_knee_r =  abs(robot().externalTorques()[right_knee_index]);
+  double tau_ext_knee_l =  abs(robot().externalTorques()[left_knee_index]);
+  double leftFootRatio = tau_ext_knee_l/(tau_ext_knee_r+tau_ext_knee_l);
+  if(tau_ext_knee_r + tau_ext_knee_l < 0.02)
+  {
+    leftFootRatio = 0.5;
+  }
+         
+  Eigen::VectorXd w_r = X_foot_r.translation();
+  Eigen::VectorXd w_l = X_foot_l.translation();
+  Eigen::VectorXd contact_anchor = (w_r * (1 - leftFootRatio) + w_l * leftFootRatio)  ;
+  Eigen::VectorXd anchor_vel = (v_foot_r.linear() * (1 - leftFootRatio) + v_foot_l.linear() * leftFootRatio);
+  contactAnchorTf_ = sva::PTransformd(Eigen::Matrix3d::Identity(), contact_anchor); 
+
+  return {contactAnchorTf_, anchor_vel};
 }

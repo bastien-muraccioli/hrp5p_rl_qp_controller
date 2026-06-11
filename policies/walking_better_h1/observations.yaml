@@ -3,9 +3,13 @@ training_convention: mjlab
 observations:
   - type: base_ang_vel
     history: 3
+    parameters:
+      scale: 0.25
 
-  - type: base_lin_vel
+  - type: base_orientation
     history: 3
+    parameters:
+      index: [0,1] # roll, pitch
 
   - type: joint_pos_rel
     history: 3
@@ -16,6 +20,7 @@ observations:
     history: 3
     parameters:
       joints: legs
+      scale: 0.05
 
   - type: last_action
     history: 3

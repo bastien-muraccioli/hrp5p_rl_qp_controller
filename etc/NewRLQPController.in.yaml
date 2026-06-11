@@ -26,11 +26,37 @@ collisions:
     useMinimal: true
 
 ObserverPipelines:
-  - name: Pipeline
-    observers:
-      - type: Encoder
-        config:
+  name: MainPipeline
+  gui: true
+  log: true
+
+  observers:
+    - type: Encoder
+      config:
           velocity: encoderVelocities
+    - type: Tilt
+      required: true
+      update: true
+      config:
+        anchorFrameFunction: anchorFrameFunction
+        filterGains:
+          initAlpha: 2
+          initBeta: 2
+          initGamma: 1
+          finalAlpha: 2
+          finalBeta: 2
+          finalGamma: 1
+    - type: ExternalForcesObserver
+      required: true
+      config:
+        residual_gain: 100
+        reference_frame: pelvis
+        verbose: false
+        ft_sensor_name: none
+        use_force_sensor: false
+        torque_source_type: CommandedTorque
+        residual_speed_gain: 100
+
 
 states: {}
 

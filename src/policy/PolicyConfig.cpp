@@ -32,7 +32,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder)
 
     out.useQP = control("use_QP", out.rawPolicy("use_QP", true));
     out.policyStepSize = control("policy_step_size", out.rawPolicy("policy_step_size", 0.02));
-    out.physicsStepSize = control("physics_step_size", out.rawPolicy("physics_step_size", 0.001));
     out.kpScale = control("kp_scale", out.rawPolicy("pd_gains_ratio", 1.0));
     out.kdScale = control("kd_scale", std::sqrt(out.kpScale));
 
@@ -43,7 +42,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder)
   {
     out.useQP = out.rawPolicy("use_QP", true);
     out.policyStepSize = out.rawPolicy("policy_step_size", 0.02);
-    out.physicsStepSize = out.rawPolicy("physics_step_size", 0.001);
     out.kpScale = out.rawPolicy("pd_gains_ratio", 1.0);
     out.kdScale = std::sqrt(out.kpScale);
   }
@@ -132,11 +130,6 @@ void PolicyConfig::validate() const
   if(policyStepSize <= 0.0)
   {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.policy_step_size must be positive", name);
-  }
-
-  if(physicsStepSize <= 0.0)
-  {
-    mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.physics_step_size must be positive", name);
   }
 
   if(kpScale <= 0.0)

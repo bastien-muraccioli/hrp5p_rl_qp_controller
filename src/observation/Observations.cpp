@@ -49,9 +49,14 @@ void JointPosObservation::configure(const ObservationContext & context)
 
 void JointPosObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
+  auto q_map = context.observationRobot.encoderValues();
+  Eigen::VectorXd currentPos = Eigen::VectorXd::Zero(context.observationRobot.mb().nrDof()-6);
+  if (q_map.size() != 0)
+    currentPos = Eigen::VectorXd::Map(q_map.data(), q_map.size());
+
   for(size_t i = 0; i < mbcIndices_.size(); ++i)
   {
-    double value = context.observationRobot.mbc().q[static_cast<size_t>(mbcIndices_[i])][0];
+    double value = currentPos[static_cast<size_t>(mbcIndices_[i]-1)];
 
     if(relativeToDefaultPose_)
     {
@@ -98,9 +103,14 @@ void JointVelObservation::configure(const ObservationContext & context)
 
 void JointVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
+  auto vel_map = context.observationRobot.encoderValues();
+  Eigen::VectorXd currentVel = Eigen::VectorXd::Zero(context.observationRobot.mb().nrDof()-6);
+  if (vel_map.size() != 0)
+    currentVel = Eigen::VectorXd::Map(vel_map.data(), vel_map.size());
+
   for(size_t i = 0; i < mbcIndices_.size(); ++i)
   {
-    double value = context.observationRobot.mbc().alpha[static_cast<size_t>(mbcIndices_[i])][0];
+    double value = currentVel[static_cast<size_t>(mbcIndices_[i]-1)];
 
     if(relativeToDefaultVelocity_)
     {
@@ -167,24 +177,24 @@ void BaseAngVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::string body = readParameter<std::string>(parameters, "body", context.baseBody);
+  sensorName_ = readParameter<std::string>(parameters, "sensor", std::string("Accelerometer"));
 
-  if(!context.observationRobot.hasBody(body))
+  if(!context.observationRobot.hasBodySensor(sensorName_))
   {
     mc_rtc::log::error_and_throw(
-      "[Observation:{}] Body '{}' does not exist on robot '{}'",
+      "[Observation:{}] Body sensor '{}' does not exist on robot '{}'",
       name(),
-      body,
+      sensorName_,
       context.observationRobot.name());
   }
 
-  bodyIndex_ = context.observationRobot.mb().bodyIndexByName(body);
   scale_ = readScaleVector(parameters, "scale", 3, 1.0);
 }
 
 void BaseAngVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  const Eigen::Vector3d value = context.observationRobot.mbc().bodyVelB[static_cast<size_t>(bodyIndex_)].angular();
+  const auto & imu = context.observationRobot.bodySensor(sensorName_);
+  const Eigen::Vector3d value = imu.angularVelocity();
   out = value.cwiseProduct(scale_);
 }
 
@@ -203,24 +213,24 @@ void BaseLinVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::string body = readParameter<std::string>(parameters, "body", context.baseBody);
+  sensorName_ = readParameter<std::string>(parameters, "sensor", std::string("Accelerometer"));
 
-  if(!context.observationRobot.hasBody(body))
+  if(!context.observationRobot.hasBodySensor(sensorName_))
   {
     mc_rtc::log::error_and_throw(
-      "[Observation:{}] Body '{}' does not exist on robot '{}'",
+      "[Observation:{}] Body sensor '{}' does not exist on robot '{}'",
       name(),
-      body,
+      sensorName_,
       context.observationRobot.name());
   }
 
-  bodyIndex_ = context.observationRobot.mb().bodyIndexByName(body);
   scale_ = readScaleVector(parameters, "scale", 3, 1.0);
 }
 
 void BaseLinVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  const Eigen::Vector3d value = context.observationRobot.mbc().bodyVelB[static_cast<size_t>(bodyIndex_)].linear();
+  const auto & imu = context.observationRobot.bodySensor(sensorName_);
+  const Eigen::Vector3d value = imu.linearVelocity();
   out = value.cwiseProduct(scale_);
 }
 
@@ -320,6 +330,8 @@ void BaseOrientationObservation::configure(const ObservationContext & context)
       context.observationRobot.name());
   }
 
+  indexes_ = readParameter<std::vector<int>>(parameters, "index", {0,1,2});
+
   scale_ = readScaleVector(parameters, "scale", 3, 1.0);
 }
 
@@ -329,8 +341,14 @@ void BaseOrientationObservation::compute(const ObservationContext & context, Eig
 
   Eigen::Matrix3d baseRot = imu.orientation().toRotationMatrix().normalized();
   const Eigen::Vector3d rpy = mc_rbdyn::rpyFromMat(baseRot);
+  Eigen::VectorXd rpy_scaled = rpy.cwiseProduct(scale_);
 
-  out = rpy.cwiseProduct(scale_);
+  if (indexes_.size() == 3)
+    out = rpy_scaled;
+  else
+  {
+    out = rpy_scaled(Eigen::Map<const Eigen::VectorXi>(indexes_.data(), indexes_.size()));
+  }
 }
 
 //============================================================================//

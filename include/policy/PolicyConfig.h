@@ -19,7 +19,6 @@ struct PolicyConfig
 
   bool useQP = true;
   double policyStepSize = 0.02;
-  double physicsStepSize = 0.001;
   double kpScale = 1.0;
   double kdScale = 1.0;
 
