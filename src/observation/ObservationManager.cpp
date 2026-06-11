@@ -27,13 +27,10 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
   size_ = 0;
 
   const std::string conventionName = observationsConfig("training_convention", std::string("mjlab"));
-
   convention_ = ObservationConvention::fromConfig(controllerConfig, conventionName);
 
   if(!observationsConfig.has("observations"))
-  {
     mc_rtc::log::error_and_throw("[ObservationManager] observations.yaml has no required 'observations' list");
-  }
 
   mc_rtc::Configuration observations = observationsConfig("observations");
 
@@ -48,9 +45,7 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
   }
 
   if(entries_.empty())
-  {
     mc_rtc::log::error_and_throw("[ObservationManager] observations.yaml defines an empty observation list");
-  }
 
   mc_rtc::log::success(
     "[ObservationManager] Loaded {} observations with '{}' convention",
@@ -74,16 +69,13 @@ void ObservationManager::updateHistory(const ObservationContext & context)
   for(size_t i = 0; i < entries_.size(); ++i)
   {
     Entry & entry = entries_[i];
-
     entry.historyBuffer.clear();
 
     Eigen::VectorXd current = Eigen::VectorXd::Zero(entry.observation->size());
     entry.observation->compute(context, current);
 
     for(int h = 0; h < entry.observation->history(); ++h)
-    {
       entry.historyBuffer.push_front(current);
-    }
   }
 }
 
@@ -99,34 +91,17 @@ Eigen::VectorXd ObservationManager::compute(const ObservationContext & context)
     Eigen::VectorXd current = Eigen::VectorXd::Zero(entry.observation->size());
     entry.observation->compute(context, current);
 
-    if(!entry.historyBuffer.empty() && entry.historyBuffer.front().size() != current.size())
-    {
-      mc_rtc::log::error_and_throw(
-        "[ObservationManager] Observation '{}' changed dimension from {} to {}",
-        entry.observation->name(),
-        entry.historyBuffer.front().size(),
-        current.size());
-    }
-
     entry.historyBuffer.push_front(current);
-
     while(static_cast<int>(entry.historyBuffer.size()) > entry.observation->history())
-    {
       entry.historyBuffer.pop_back();
-    }
 
-    Eigen::VectorXd stacked = flattenHistory(entry);
-
-    out.segment(offset, stacked.size()) = stacked;
-    offset += static_cast<int>(stacked.size());
+    Eigen::VectorXd flatten = flattenHistory(entry);
+    out.segment(offset, flatten.size()) = flatten;
+    offset += static_cast<int>(flatten.size());
   }
 
   return out;
 }
-
-int ObservationManager::size() const { return size_; }
-
-const std::string & ObservationManager::conventionName() const { return convention_.name; }
 
 ObservationConfig ObservationManager::parseObservationConfig(const mc_rtc::Configuration & config) const
 {
