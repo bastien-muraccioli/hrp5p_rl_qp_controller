@@ -27,9 +27,7 @@ void JointPosObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<int> controllerIndices =
-    context.convention.resolveJointControllerIndices(parameters, context.controllerJointOrder,
-                                                     context.policyJointControllerIndices);
+  const std::vector<int> controllerIndices = context.policyJointControllerIndices;
 
   const int n = static_cast<int>(controllerIndices.size());
   mbcIndices_.resize(static_cast<size_t>(n));
@@ -82,9 +80,7 @@ void JointVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<int> controllerIndices =
-    context.convention.resolveJointControllerIndices(parameters, context.controllerJointOrder,
-                                                     context.policyJointControllerIndices);
+  const std::vector<int> controllerIndices = context.policyJointControllerIndices;
 
   const int n = static_cast<int>(controllerIndices.size());
   mbcIndices_.resize(static_cast<size_t>(n));

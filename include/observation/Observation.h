@@ -16,14 +16,8 @@ namespace rlqp
 
 /**
  * @brief Training-environment convention defaults.
- *
- * A convention describes how an external training environment names
- * observations and which default parameters it expects. It should not contain
- * robot-specific information such as the base body name.
- *
- * Examples:
- * - mjlab exposes joint_pos_rel, implemented internally by joint_pos.
- * - mjlab exposes generated_commands, implemented internally by command.
+ * ex: mjlab exposes joint_pos_rel and generated_commands (names in mjlab),
+ * implemented internally by joint_pos and command with a default config.
  */
 struct ObservationConvention
 {
@@ -34,9 +28,8 @@ struct ObservationConvention
   std::map<std::string, std::vector<std::string> > jointGroups;
 
   /**
-   * @brief Default parameters keyed by exact external observation name first.
-   *
-   * Example: mjlab::joint_pos_rel can have defaults that differ from a generic
+   * @brief Default parameters keyed by exact external observation name.
+   * ex: mjlab::joint_pos_rel can have defaults that differ from a generic
    * joint_pos implementation.
    */
   std::map<std::string, mc_rtc::Configuration> defaultParameters;
@@ -44,21 +37,12 @@ struct ObservationConvention
   /** @brief Maps external observation names to internal generic implementations. */
   std::map<std::string, std::string> typeAliases;
 
-  /**
-   * @brief Load one convention block.
-   *
-   * The preferred location is policies/conventions.yaml, found from
-   * controllerConfig["policies_root"]. For compatibility, this also accepts a
-   * controllerConfig that directly contains a "conventions" block.
-   */
+  /** @brief Load one convention block from a file with a "conventions" entry */
   static ObservationConvention fromConfig(const mc_rtc::Configuration & controllerConfig,
                                           const std::string & conventionName);
 
   /** @brief Resolve an external YAML type to an internal registered observation type. */
   std::string resolveType(const std::string & requestedType) const;
-
-  /** @brief Named mc_rtc joint groups (all, legs, arms, ...) for cross-convention subset resolution. */
-  std::map<std::string, std::vector<std::string> > mcRtcJointGroups;
 
   /**
    * @brief Resolve an observation joint selector to controller joint indices.

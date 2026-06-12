@@ -6,10 +6,26 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+  double find_value(std::map<std::string, double> map, std::string joint, std::string map_name, double def = -1)
+  {
+    auto it = map.find(joint);
+    if (it == map.end())
+    {
+      mc_rtc::log::warning("[PolicyConfig] Missing entry {} in {}", joint, map_name);
+      return def;
+    }
+    return it->second;
+  }
+} // namespace
 namespace rlqp
 {
 
-PolicyConfig PolicyConfig::load(const std::string & policyFolder)
+//============================================================================//
+// PolicyConfig
+//============================================================================//
+PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<std::string> mcRtcJoints)
 {
   PolicyConfig out;
 
@@ -17,88 +33,62 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder)
   out.policyYamlPath = config::joinPath(policyFolder, "policy.yaml");
   out.observationsYamlPath = config::joinPath(policyFolder, "observations.yaml");
 
-  out.rawPolicy.load(out.policyYamlPath);
-  out.rawObservations.load(out.observationsYamlPath);
+  out.policyConfiguration.load(out.policyYamlPath);
+  out.observationsConfiguration.load(out.observationsYamlPath);
 
-  out.name = out.rawPolicy("name", config::basenameWithoutExtension(policyFolder));
+  out.kp = std::vector<double>(mcRtcJoints.size());
+  out.kd = std::vector<double>(mcRtcJoints.size());
+
+  out.name = out.policyConfiguration("name", config::basenameWithoutExtension(policyFolder));
 
   const std::string defaultOnnxName = out.name + ".onnx";
-  const std::string onnxFile = out.rawPolicy("onnx", defaultOnnxName);
+  const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
   out.onnxPath = config::joinPath(policyFolder, onnxFile);
 
-  if(out.rawPolicy.has("control"))
-  {
-    const mc_rtc::Configuration control = out.rawPolicy("control");
+  std::map<std::string, double> kp_map, kd_map, defaultPos_map, actionScale_map;
 
-    out.useQP = control("use_QP", out.rawPolicy("use_QP", true));
-    out.policyStepSize = control("policy_step_size", out.rawPolicy("policy_step_size", 0.02));
-    out.kpScale = control("kp_scale", out.rawPolicy("pd_gains_ratio", 1.0));
+  if(out.policyConfiguration.has("control"))
+  {
+    const mc_rtc::Configuration control = out.policyConfiguration("control");
+
+    out.useQP = control("use_QP", out.policyConfiguration("use_QP", true));
+    out.policyStepSize = control("policy_step_size", out.policyConfiguration("policy_step_size", 0.02));
+    out.kpScale = control("kp_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
     out.kdScale = control("kd_scale", std::sqrt(out.kpScale));
 
-    out.kp = config::readOr<std::map<std::string, double> >(control, "kp", std::map<std::string, double>());
-    out.kd = config::readOr<std::map<std::string, double> >(control, "kd", std::map<std::string, double>());
+    kp_map = control("kp", std::map<std::string, double>());
+    kd_map = control("kd", std::map<std::string, double>());
+    mc_rtc::log::warning("?? {} {} {}", kp_map.size(), kd_map.size(), mcRtcJoints.size());
+    if (kp_map.size() < mcRtcJoints.size() || kd_map.size() < mcRtcJoints.size())
+      mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml: kp and kd must contain all joints");
   }
   else
+    mc_rtc::log::error_and_throw("[PolicyConfig]: policy.yaml should contain a \"control\" entry");
+  if (out.policyConfiguration.has("action"))
   {
-    out.useQP = out.rawPolicy("use_QP", true);
-    out.policyStepSize = out.rawPolicy("policy_step_size", 0.02);
-    out.kpScale = out.rawPolicy("pd_gains_ratio", 1.0);
-    out.kdScale = std::sqrt(out.kpScale);
-  }
+    out.policyConfiguration("action")("joints", out.actionJointGroup);
+    actionScale_map = out.policyConfiguration("scale", std::map<std::string, double>());
+    defaultPos_map = out.policyConfiguration("default_position", std::map<std::string, double>());
 
-  if(!out.rawPolicy.has("action"))
-  {
-    mc_rtc::log::error_and_throw("[PolicyConfig:{}] policy.yaml is missing required section 'action'", out.name);
+    out.actionScale = std::vector<double>(actionScale_map.size());
+    out.defaultPosition = std::vector<double>(defaultPos_map.size());
+    if (!out.defaultPosition.empty() && out.defaultPosition.size() != mcRtcJoints.size())
+      mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml : default pos should contain all joints if specified");
   }
+  else
+    mc_rtc::log::error_and_throw("[PolicyConfig]: policy.yaml should contain a \"action\" entry");
+    
+  for(size_t i = 0; i < mcRtcJoints.size(); ++i)
+  {
+    const std::string & joint = mcRtcJoints[i];
 
-  const mc_rtc::Configuration action = out.rawPolicy("action");
-
-  if(!action.has("joints"))
-  {
-    mc_rtc::log::error_and_throw("[PolicyConfig:{}] Missing required field 'action.joints'", out.name);
-  }
-
-  try
-  {
-    action("joints", out.actionJointGroup);
-  }
-  catch(...)
-  {
-  }
-
-  if(out.actionJointGroup.empty())
-  {
-    out.actionJoints = config::readRequired<std::vector<std::string> >(action, "joints", "PolicyConfig:" + out.name);
-  }
-
-  try
-  {
-    out.actionScale = config::readOr<std::map<std::string, double> >(action, "scale", std::map<std::string, double>());
-  }
-  catch(...)
-  {
-    /* action.scale may be a scalar. It is read later by RLPolicyRuntime when
-     * the action joint order has been resolved. */
-  }
-
-  try
-  {
-    out.defaultPosition = config::readOr<std::map<std::string, double> >(action, "default_position", std::map<std::string, double>());
-  }
-  catch(...)
-  {
-    /* action.default_position may be a scalar. It is read later by
-     * RLPolicyRuntime when the action joint order has been resolved. */
-  }
-
-  if(out.kp.empty())
-  {
-    out.kp = config::readOr<std::map<std::string, double> >(out.rawPolicy, "kp", std::map<std::string, double>());
-  }
-
-  if(out.kd.empty())
-  {
-    out.kd = config::readOr<std::map<std::string, double> >(out.rawPolicy, "kd", std::map<std::string, double>());
+    out.kp[i] = find_value(kp_map, joint, "kp");
+    out.kd[i] = find_value(kd_map, joint, "kd");
+    
+    if (out.actionScale.size() > 0)
+      out.actionScale.push_back(find_value(actionScale_map, joint, "action scale", 1));
+    if (out.defaultPosition.size() > 0)
+      out.defaultPosition.push_back(find_value(defaultPos_map, joint, "default_position", 0));
   }
 
   out.validate();
@@ -108,42 +98,32 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder)
 void PolicyConfig::validate() const
 {
   if(name.empty())
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig] Policy name cannot be empty");
-  }
 
   if(folder.empty())
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] Policy folder cannot be empty", name);
-  }
 
   if(onnxPath.empty())
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] ONNX path cannot be empty", name);
-  }
 
-  if(actionJointGroup.empty() && actionJoints.empty())
-  {
+  if(actionJointGroup.empty())
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] action.joints cannot be empty", name);
-  }
 
   if(policyStepSize <= 0.0)
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.policy_step_size must be positive", name);
-  }
 
   if(kpScale <= 0.0)
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.kp_scale must be positive", name);
-  }
 
   if(kdScale <= 0.0)
-  {
     mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.kd_scale must be positive", name);
-  }
+  
 }
 
-void PolicyManager::load(const mc_rtc::Configuration & controllerConfig)
+//============================================================================//
+// PolicyManager
+//============================================================================//
+void PolicyManager::load(const mc_rtc::Configuration & controllerConfig, std::vector<std::string> mcRtcJoints)
 {
   orderedNames_.clear();
   policies_.clear();
@@ -162,12 +142,10 @@ void PolicyManager::load(const mc_rtc::Configuration & controllerConfig)
 
   for(size_t i = 0; i < folders.size(); ++i)
   {
-    PolicyConfig policy = PolicyConfig::load(folders[i]);
+    PolicyConfig policy = PolicyConfig::load(folders[i], mcRtcJoints);
 
     if(policies_.find(policy.name) != policies_.end())
-    {
       mc_rtc::log::error_and_throw("[PolicyManager] Duplicate policy name '{}'", policy.name);
-    }
 
     orderedNames_.push_back(policy.name);
     policies_[policy.name] = policy;
@@ -183,22 +161,13 @@ void PolicyManager::load(const mc_rtc::Configuration & controllerConfig)
                        currentName_);
 }
 
-bool PolicyManager::empty() const { return policies_.empty(); }
-
-size_t PolicyManager::size() const { return policies_.size(); }
-
-const PolicyConfig & PolicyManager::current() const { return get(currentName_); }
-
-const std::string & PolicyManager::currentName() const { return currentName_; }
 
 const PolicyConfig & PolicyManager::get(const std::string & name) const
 {
   std::map<std::string, PolicyConfig>::const_iterator it = policies_.find(name);
 
   if(it == policies_.end())
-  {
     mc_rtc::log::error_and_throw("[PolicyManager] Unknown policy '{}'", name);
-  }
 
   return it->second;
 }
@@ -212,9 +181,7 @@ void PolicyManager::select(const std::string & name)
 void PolicyManager::selectNext()
 {
   if(orderedNames_.empty())
-  {
     mc_rtc::log::error_and_throw("[PolicyManager] Cannot select next policy: no policies loaded");
-  }
 
   std::vector<std::string>::const_iterator it =
     std::find(orderedNames_.begin(), orderedNames_.end(), currentName_);
@@ -228,16 +195,9 @@ void PolicyManager::selectNext()
   ++it;
 
   if(it == orderedNames_.end())
-  {
     it = orderedNames_.begin();
-  }
 
   currentName_ = *it;
-}
-
-std::vector<std::string> PolicyManager::names() const
-{
-  return orderedNames_;
 }
 
 } // namespace rlqp

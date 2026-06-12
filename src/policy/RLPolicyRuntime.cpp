@@ -51,7 +51,7 @@ void RLPolicyRuntime::configure(const mc_rtc::Configuration & controllerConfig,
 
   observationRegistry_ = makeDefaultObservationRegistry();
 
-  policyManager_.load(controllerConfig_);
+  policyManager_.load(controllerConfig_, ctl.jointNames);
   loadPolicy(policyManager_.currentName(), ctl, torqueTask);
 }
 
@@ -174,7 +174,7 @@ void RLPolicyRuntime::loadPolicy(const std::string & policyName,
   configureControl(policy, ctl, torqueTask);
 
   const std::string conventionName =
-    policy.rawObservations("training_convention", std::string("mjlab"));
+    policy.observationsConfiguration("training_convention", std::string("mjlab"));
   activeConvention_ = ObservationConvention::fromConfig(controllerConfig_, conventionName);
 
   configureAction(policy, ctl);
@@ -203,11 +203,11 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   policyStepSize_ = policy.policyStepSize;
   pdGainsRatio_ = policy.kpScale;
 
-  phasePeriod_ = policy.rawObservations("phase_period", 1.0);
+  phasePeriod_ = policy.observationsConfiguration("phase_period", 1.0);
   
-  if(policy.rawPolicy.has("control"))
+  if(policy.policyConfiguration.has("control"))
   {
-    const mc_rtc::Configuration control = policy.rawPolicy("control");
+    const mc_rtc::Configuration control = policy.policyConfiguration("control");
 
     if(control.has("phase_period"))
     {
@@ -225,20 +225,8 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   kpBase_.setZero();
   kdBase_.setZero();
 
-  for(size_t i = 0; i < controllerJointOrder_.size(); ++i)
-  {
-    const std::string & joint = controllerJointOrder_[i];
-
-    if(policy.kp.find(joint) != policy.kp.end())
-    {
-      kpBase_(static_cast<int>(i)) = mapValueOrThrow(policy.kp, joint, "kp", policy.name);
-    }
-
-    if(policy.kd.find(joint) != policy.kd.end())
-    {
-      kdBase_(static_cast<int>(i)) = mapValueOrThrow(policy.kd, joint, "kd", policy.name);
-    }
-  }
+  kpBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kp.data(), policy.kp.size());
+  kdBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kd.data(), policy.kp.size());
 
   kp_ = policy.kpScale * kpBase_;
   kd_ = policy.kdScale * kdBase_;
@@ -257,11 +245,9 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
   mc_rtc::Configuration selector;
   if(!policy.actionJointGroup.empty())
   {
+    mc_rtc::log::error(policy.actionJointGroup);
+    mc_rtc::log::error(activeConvention_.jointGroups);
     selector.add("joints", policy.actionJointGroup);
-  }
-  else if(!policy.actionJoints.empty())
-  {
-    selector.add("joints", policy.actionJoints);
   }
 
   // Fallback: all controller joints in controller order
@@ -276,7 +262,7 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
   actionScale_.setOnes();
   currentActionScaled_.setZero();
 
-  const mc_rtc::Configuration action = policy.rawPolicy("action");
+  const mc_rtc::Configuration action = policy.policyConfiguration("action");
 
   double scalarActionScale = 1.0;
   if(action.has("scale"))
@@ -318,17 +304,18 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     }
 
     actionScale_(dofIndex) = scalarActionScale;
-    std::map<std::string, double>::const_iterator scaleIt = policy.actionScale.find(joint);
-    if(scaleIt != policy.actionScale.end())
-    {
-      actionScale_(dofIndex) = scaleIt->second;
-    }
+    //TODO make action scale work
+    // std::map<std::string, double>::const_iterator scaleIt = policy.actionScale.find(joint);
+    // if(scaleIt != policy.actionScale.end())
+    // {
+    //   actionScale_(dofIndex) = scaleIt->second;
+    // }
     
-    std::map<std::string, double>::const_iterator defaultIt = policy.defaultPosition.find(joint);
-    if(defaultIt != policy.defaultPosition.end())
-    {
-      q_zero_(dofIndex) = defaultIt->second;
-    }
+    // std::map<std::string, double>::const_iterator defaultIt = policy.defaultPosition.find(joint);
+    // if(defaultIt != policy.defaultPosition.end())
+    // {
+    //   q_zero_(dofIndex) = defaultIt->second;
+    // }
   }
   mc_rtc::log::error(q_zero_);
 
@@ -373,7 +360,7 @@ void RLPolicyRuntime::configureNetwork(const PolicyConfig & policy)
 void RLPolicyRuntime::configureObservations(const PolicyConfig & policy,
                                             NewRLQPController & ctl)
 {
-  observationManager_.load(policy.rawObservations, controllerConfig_, observationRegistry_);
+  observationManager_.load(policy.observationsConfiguration, controllerConfig_, observationRegistry_);
   observationManager_.configure(makeObservationContext(ctl));
 
   currentObservation_ = Eigen::VectorXd::Zero(policy_->getObservationSize());

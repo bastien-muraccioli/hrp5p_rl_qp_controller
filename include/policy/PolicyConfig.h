@@ -9,6 +9,10 @@
 namespace rlqp
 {
 
+/**
+ * @brief Owns a policy configuration and informations
+ * All data is stored in mc_rtc joint order.
+ */
 struct PolicyConfig
 {
   std::string name;
@@ -22,50 +26,47 @@ struct PolicyConfig
   double kpScale = 1.0;
   double kdScale = 1.0;
 
-  /**
-   * @brief Optional joint-group selector from policy.yaml/action/joints.
-   *
-   * Filled only when action.joints is written as a string, e.g. ``joints: legs``.
-   * The group is resolved by RLPolicyRuntime using the active convention.
-   */
+  /** @brief Optional joint-group selector from policy.yaml/action/joints. */
   std::string actionJointGroup;
 
-  /** @brief Explicit ordered action joints when action.joints is a YAML list. */
-  std::vector<std::string> actionJoints;
+  /** @brief Optional per-joint action scale overrides. Missing entries will use scale 1.0. */
+  std::vector<double> actionScale;
 
-  /** @brief Per-joint action scale overrides. Missing entries use scale 1.0. */
-  std::map<std::string, double> actionScale;
+  /** @brief Optional er-joint default target pose overrides. No missing entries allowed. */
+  std::vector<double> defaultPosition;
 
-  /** @brief Per-joint default target pose overrides. Missing entries use 0.0. */
-  std::map<std::string, double> defaultPosition;
-  std::map<std::string, double> kp;
-  std::map<std::string, double> kd;
+  /** @brief Mandatory kp and kd */
+  std::vector<double> kp;
+  std::vector<double> kd;
 
-  mc_rtc::Configuration rawPolicy;
-  mc_rtc::Configuration rawObservations;
+  mc_rtc::Configuration policyConfiguration;
+  mc_rtc::Configuration observationsConfiguration;
 
-  static PolicyConfig load(const std::string & policyFolder);
+  static PolicyConfig load(const std::string & policyFolder, std::vector<std::string> mcRtcJoints);
 
   void validate() const;
 };
 
+/** @brief Handles the loadable policies */
 class PolicyManager
 {
 public:
-  void load(const mc_rtc::Configuration & controllerConfig);
+  void load(const mc_rtc::Configuration & controllerConfig, std::vector<std::string> mcRtcJoints);
 
-  bool empty() const;
-  size_t size() const;
+  bool empty() const { return policies_.empty(); };
 
-  const PolicyConfig & current() const;
-  const std::string & currentName() const;
+  size_t size() const { return policies_.size(); };
+
+  const PolicyConfig & current() const { return get(currentName_); };
+
+  const std::string & currentName() const { return currentName_; };
 
   const PolicyConfig & get(const std::string & name) const;
 
+  std::vector<std::string> names() const {return orderedNames_; };
+
   void select(const std::string & name);
   void selectNext();
-
-  std::vector<std::string> names() const;
 
 private:
   std::vector<std::string> orderedNames_;
