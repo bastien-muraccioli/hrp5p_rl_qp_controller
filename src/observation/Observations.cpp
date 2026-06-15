@@ -57,9 +57,7 @@ void JointPosObservation::compute(const ObservationContext & context, Eigen::Ref
     double value = currentPos[static_cast<size_t>(mbcIndices_[i]-1)];
 
     if(relativeToDefaultPose_)
-    {
       value -= defaultPose_(static_cast<int>(i));
-    }
 
     out(static_cast<int>(i)) = scale_(static_cast<int>(i)) * value;
   }
@@ -109,9 +107,7 @@ void JointVelObservation::compute(const ObservationContext & context, Eigen::Ref
     double value = currentVel[static_cast<size_t>(mbcIndices_[i]-1)];
 
     if(relativeToDefaultVelocity_)
-    {
       value -= defaultVelocity_(static_cast<int>(i));
-    }
 
     out(static_cast<int>(i)) = scale_(static_cast<int>(i)) * value;
   }
@@ -295,9 +291,7 @@ void CommandObservation::configure(const ObservationContext & context)
 void CommandObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
   for(int i = 0; i < size_; ++i)
-  {
     out(i) = scale_(i) * context.command(i);
-  }
 }
 
 //============================================================================//
@@ -342,9 +336,7 @@ void BaseOrientationObservation::compute(const ObservationContext & context, Eig
   if (indexes_.size() == 3)
     out = rpy_scaled;
   else
-  {
     out = rpy_scaled(Eigen::Map<const Eigen::VectorXi>(indexes_.data(), indexes_.size()));
-  }
 }
 
 //============================================================================//

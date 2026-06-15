@@ -109,11 +109,6 @@ private:
   ObservationContext makeObservationContext(NewRLQPController & ctl);
   mc_rbdyn::Robot & selectedObservationRobot(NewRLQPController & ctl);
 
-  double mapValueOrThrow(const std::map<std::string, double> & values,
-                         const std::string & key,
-                         const std::string & mapName,
-                         const std::string & policyName) const;
-
 private:
   mc_rtc::Configuration controllerConfig_;
 
@@ -133,11 +128,7 @@ private:
   std::string observationSource_ = "realRobot";
 
   std::vector<std::string> controllerJointOrder_;
-  /** @brief Maps active policy action index to controllerJointOrder_ index.
-   *
-   * actionToControllerMap_[i] is the controllerJointOrder_ index of the i-th policy joint
-   * (AI convention order). Used both for action application and as
-   * policyJointControllerIndices in ObservationContext. */
+  /** @brief Maps active policy action index to controllerJointOrder_ index. policyJointControllerIndices in ObservationContext. */
   std::vector<int> actionToControllerMap_;
 
   Eigen::VectorXd q_rl_;

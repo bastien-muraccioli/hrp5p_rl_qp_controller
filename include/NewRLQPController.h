@@ -44,30 +44,26 @@
  *
  * ## Configuration
  *
- * All parameters are loaded from the YAML config file. See etc/NewRLQPController.in.yaml
- * for a fully documented example. Key sections per policy entry:
- *   - policy_path:       Path(s) to ONNX policy file(s)
- *   - action_scale:      Per-joint scale applied to raw policy output (map: joint -> scale)
- *   - q0:                Reference joint positions (default pose), in radians
- *   - kp / kd:           PD gains per joint
- *   - ref_joint_order:   Ordered list of joints controlled by the policy (action vector order)
- *   - use_QP:            Whether to route torques through the CBF-QP (true) or apply directly (false)
- *   - pd_gains_ratio:    Runtime gain scaling factor (1.0 = nominal gains)
- *   - policy_step_size:  Policy inference period in seconds (e.g. 0.02)
- *   - physics_step_size: Simulation/control timestep in seconds (e.g. 0.0025)
- *
- * ## Observation Vector
- *
- * The observation is built in utils::getCurrentObservation() and must exactly match
- * what the policy was trained on. Typical terms (history_length stacked, oldest first):
- *   - base_lin_vel:          Linear velocity of the floating base in body frame   [3]
- *   - base_ang_vel:          Angular velocity of the floating base in body frame   [3]
- *   - projected_gravity:     Unit gravity vector in body frame (from R_world_to_body * [0,0,-1]) [3]
- *   - joint_pos:             Joint positions relative to default pose: q - q_zero  [N_joints]
- *   - joint_vel:             Joint velocities                                      [N_joints]
- *   - foot_contact_forces:   Log-compressed world-frame contact forces             [N_feet * 3]
- *   - last_action:           Previous raw policy output (before scaling)           [N_action]
- *   - command:               Velocity command [vx, vy, yaw_rate]                  [3]
+ * All parameters are loaded from YAML config files :
+ * etc/NewRLQPController.in.yaml :
+ *  - policies root directory     Path where policy directories will be search for
+ *  - default policy              Name of the first policy to run
+ * {policy_root}/{policy_name} :
+ * policy.yaml :
+ *  - action_scale:      Per-joint scale applied to raw policy output (map: joint -> scale)
+ *  - q0:                Reference joint positions (default pose), in radians
+ *  - kp / kd:           PD gains per joint
+ *  - use_QP:            Whether to route torques through the CBF-QP (true) or apply directly (false)
+ *  - pd_gains_ratio:    Runtime gain scaling factor (1.0 = nominal gains)
+ *  - action_joints:     Joints on which to apply the action. Can be a pre-registered name such as "legs"
+ *  - period_ms          Frequency at which the policy should be ran
+ *  observations.yaml :
+ *  - training_convention     Convention to load default values and aliases from
+ *  - list of observations and their parameters
+ * {policy_root}/conventions.yaml : stores all known conventions (mjlab, isaaclab)
+ *  - joint groups in training order
+ *  - type aliases to correspond precisely to the name in the training environment.
+ *  - observations defaults
  *
  * Contact forces must be log-compressed before insertion:
  *   f_obs = sign(f) * log(1 + |f|)
