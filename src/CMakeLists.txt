@@ -12,7 +12,6 @@ find_library(ONNXRUNTIME_LIB
 
 set(controller_SRC
   NewRLQPController.cpp
-  ConfigurationHelpers.cpp
   observation/Observation.cpp
   observation/Observations.cpp
   observation/ObservationManager.cpp
@@ -25,7 +24,6 @@ set(controller_SRC
 set(controller_HDR
   ../include/NewRLQPController.h
   ../include/api.h
-  ../include/ConfigurationHelpers.h
   ../include/observation/Observation.h
   ../include/observation/Observations.h
   ../include/observation/ObservationManager.h

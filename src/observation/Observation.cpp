@@ -1,6 +1,5 @@
 #include "observation/Observation.h"
 #include "observation/Observations.h"
-#include "ConfigurationHelpers.h"
 
 #include <algorithm>
 #include <set>
@@ -11,9 +10,11 @@
 namespace rlqp
 {
 
+//============================================================================//
+// Helper function
+//============================================================================//
 namespace
 {
-
 template<typename T>
 std::shared_ptr<Observation> makeObservation(const ObservationConfig & config,
                                              const ObservationConvention & convention)
@@ -21,6 +22,18 @@ std::shared_ptr<Observation> makeObservation(const ObservationConfig & config,
   return std::shared_ptr<Observation>(new T(config, convention));
 }
 
+mc_rtc::Configuration loadConventionRoot(const mc_rtc::Configuration & controllerConfig)
+{
+  if(controllerConfig.has("conventions"))
+    return controllerConfig;
+  std::string policiesRoot = "policies/";
+  controllerConfig("policies_root", policiesRoot);
+  const std::string conventionsPath = policiesRoot.substr(0, '/') + "/" + "conventions.yaml";
+
+  mc_rtc::Configuration conventionsConfig;
+  conventionsConfig.load(conventionsPath);
+  return conventionsConfig;
+}
 } // namespace
 
 //============================================================================//
@@ -32,7 +45,7 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
   ObservationConvention out;
   out.name = conventionName;
 
-  mc_rtc::Configuration conventionRoot = config::loadConventionRoot(controllerConfig);
+  mc_rtc::Configuration conventionRoot = loadConventionRoot(controllerConfig);
   mc_rtc::Configuration conventions = conventionRoot("conventions");
 
   if(!conventions.has(conventionName))

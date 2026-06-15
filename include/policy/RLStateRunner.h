@@ -17,28 +17,11 @@
  * bool MyState::run(mc_control::fsm::Controller & ctl)
  * {
  *   auto & c = static_cast<NewRLQPController&>(ctl);
- *   c.utilsClass.run_rl_state(ctl);
+ *   c.rlStateRunner.run(ctl);
  *   // ... handle transitions ...
  * }
  * @endcode
  *
- * ## Adding a new policy
- *
- * 1. Add a new case to getCurrentObservation() that fills the observation vector
- *    to exactly match the training observation order and transformations.
- * 2. Uncomment and populate the relevant history buffers in NewRLQPController.h.
- * 3. Add the corresponding case index to run_rl_state() if needed.
- *
- * ## Observation construction rules
- *
- * - **History order**: oldest timestep first (index HISTORY_SIZE-1 → index 0).
- * - **Joint positions**: always relative to default pose: q_obs = q - q_zero.
- * - **Contact forces**: apply log1p compression before insertion:
- *     f_obs = sign(f) * log(1 + |f|)
- * - **Gravity vector**: rotate unit vector [0, 0, -1] from world to body frame:
- *     g_b = R_world_to_body * [0, 0, -1]
- * - **Velocities**: express in body frame using bodyVelB.
- * - **Last action**: use the raw policy output (before action_scale multiply).
  */
 struct RLStateRunner
 {  

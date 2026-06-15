@@ -1,11 +1,18 @@
 #include "policy/PolicyConfig.h"
-#include "ConfigurationHelpers.h"
 
 #include <mc_rtc/logging.h>
 
 #include <algorithm>
 #include <cmath>
+#include <dirent.h>
+#include <fstream>
+#include <sys/stat.h>
 
+namespace rlqp
+{
+//============================================================================//
+// Helper function
+//============================================================================//
 namespace
 {
   double find_value(std::map<std::string, double> map, std::string joint, std::string map_name, double def = -1)
@@ -18,9 +25,74 @@ namespace
     }
     return it->second;
   }
-} // namespace
-namespace rlqp
+
+std::string joinPath(const std::string & lhs, const std::string & rhs)
 {
+  if(lhs.empty())
+    return rhs;
+
+  if(lhs[lhs.size() - 1] == '/')
+    return lhs + rhs;
+
+  return lhs + "/" + rhs;
+}
+
+std::string basenameWithoutExtension(const std::string & path)
+{
+  std::string base = path;
+
+  const size_t slash = base.find_last_of('/');
+  if(slash != std::string::npos)
+    base = base.substr(slash + 1);
+
+  const size_t dot = base.find_last_of('.');
+  if(dot != std::string::npos)
+    base = base.substr(0, dot);
+
+  return base;
+}
+
+std::vector<std::string> listPolicies(const std::string & root,
+                                                   const std::vector<std::string> & requiredFiles)
+{
+  std::vector<std::string> folders;
+
+  DIR * dir = opendir(root.c_str());
+  if(!dir)
+    mc_rtc::log::error_and_throw("[PolicyConfig] Could not open directory '{}'", root);
+
+  struct dirent * entry = nullptr;
+  while((entry = readdir(dir)) != nullptr)
+  {
+    const std::string name = entry->d_name;
+    if(name == "." || name == "..")
+      continue;
+    
+    const std::string folder = root.substr(0, '/') + "/" + name;
+    struct stat status;
+    if (stat(folder.c_str(), &status) != 0 || !S_ISDIR(status.st_mode))
+      continue;
+
+    bool complete = true;
+    for(size_t i = 0; i < requiredFiles.size(); ++i)
+    {
+      std::ifstream file((folder.substr(0, '/') + "/" + requiredFiles[i]).c_str());
+      if(!file.good())
+      {
+        complete = false;
+        break;
+      }
+    }
+
+    if(complete)
+      folders.push_back(folder);
+  }
+
+  closedir(dir);
+  std::sort(folders.begin(), folders.end());
+  return folders;
+}
+} // namespace
 
 //============================================================================//
 // PolicyConfig
@@ -30,8 +102,8 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   PolicyConfig out;
 
   out.folder = policyFolder;
-  out.policyYamlPath = config::joinPath(policyFolder, "policy.yaml");
-  out.observationsYamlPath = config::joinPath(policyFolder, "observations.yaml");
+  out.policyYamlPath = policyFolder.substr(0, '/') + "/" + "policy.yaml";
+  out.observationsYamlPath = policyFolder.substr(0, '/') + "/" + "observations.yaml";
 
   out.policyConfiguration.load(out.policyYamlPath);
   out.observationsConfiguration.load(out.observationsYamlPath);
@@ -39,11 +111,12 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   out.kp = std::vector<double>(mcRtcJoints.size());
   out.kd = std::vector<double>(mcRtcJoints.size());
 
-  out.name = out.policyConfiguration("name", config::basenameWithoutExtension(policyFolder));
+  out.name = out.policyConfiguration("name", basenameWithoutExtension(policyFolder));
+  mc_rtc::log::error(out.name);
 
   const std::string defaultOnnxName = out.name + ".onnx";
   const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
-  out.onnxPath = config::joinPath(policyFolder, onnxFile);
+  out.onnxPath = policyFolder.substr(0, '/') + "/" + onnxFile;
 
   std::map<std::string, double> kp_map, kd_map, defaultPos_map, actionScale_map;
 
@@ -130,8 +203,7 @@ void PolicyManager::load(const mc_rtc::Configuration & controllerConfig, std::ve
   currentName_.clear();
 
   const std::string policiesRoot = controllerConfig("policies_root", std::string("policies"));
-  const std::vector<std::string> folders =
-    config::listPolicies(policiesRoot, {"policy.yaml", "observations.yaml"});
+  const std::vector<std::string> folders = listPolicies(policiesRoot, {"policy.yaml", "observations.yaml"});
 
   if(folders.empty())
   {
