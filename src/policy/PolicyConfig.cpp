@@ -26,17 +26,6 @@ namespace
     return it->second;
   }
 
-std::string joinPath(const std::string & lhs, const std::string & rhs)
-{
-  if(lhs.empty())
-    return rhs;
-
-  if(lhs[lhs.size() - 1] == '/')
-    return lhs + rhs;
-
-  return lhs + "/" + rhs;
-}
-
 std::string basenameWithoutExtension(const std::string & path)
 {
   std::string base = path;
@@ -108,8 +97,10 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   out.policyConfiguration.load(out.policyYamlPath);
   out.observationsConfiguration.load(out.observationsYamlPath);
 
-  out.kp = std::vector<double>(mcRtcJoints.size());
-  out.kd = std::vector<double>(mcRtcJoints.size());
+  int joint_size = mcRtcJoints.size();
+
+  out.kp = std::vector<double>(joint_size);
+  out.kd = std::vector<double>(joint_size);
 
   out.name = out.policyConfiguration("name", basenameWithoutExtension(policyFolder));
   mc_rtc::log::error(out.name);
@@ -117,7 +108,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   const std::string defaultOnnxName = out.name + ".onnx";
   const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
   out.onnxPath = policyFolder.substr(0, '/') + "/" + onnxFile;
-
   std::map<std::string, double> kp_map, kd_map, defaultPos_map, actionScale_map;
 
   if(out.policyConfiguration.has("control"))
@@ -127,12 +117,11 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     out.useQP = control("use_QP", out.policyConfiguration("use_QP", true));
     out.policyStepSize = control("policy_step_size", out.policyConfiguration("policy_step_size", 0.02));
     out.kpScale = control("kp_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
-    out.kdScale = control("kd_scale", std::sqrt(out.kpScale));
+    out.kdScale = control("kd_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
 
     kp_map = control("kp", std::map<std::string, double>());
     kd_map = control("kd", std::map<std::string, double>());
-    mc_rtc::log::warning("?? {} {} {}", kp_map.size(), kd_map.size(), mcRtcJoints.size());
-    if (kp_map.size() < mcRtcJoints.size() || kd_map.size() < mcRtcJoints.size())
+    if (kp_map.size() < joint_size || kd_map.size() < mcRtcJoints.size())
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml: kp and kd must contain all joints");
   }
   else
@@ -140,18 +129,25 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   if (out.policyConfiguration.has("action"))
   {
     out.policyConfiguration("action")("joints", out.actionJointGroup);
-    actionScale_map = out.policyConfiguration("scale", std::map<std::string, double>());
+    try
+    {
+      double scale = out.policyConfiguration("scale", 1.0);
+      out.actionScale = std::vector<double>(joint_size, scale);
+    }
+    catch(...)
+    {
+      actionScale_map = out.policyConfiguration("scale", std::map<std::string, double>());
+      out.actionScale = std::vector<double>(actionScale_map.size());
+    }
     defaultPos_map = out.policyConfiguration("default_position", std::map<std::string, double>());
-
-    out.actionScale = std::vector<double>(actionScale_map.size());
     out.defaultPosition = std::vector<double>(defaultPos_map.size());
-    if (!out.defaultPosition.empty() && out.defaultPosition.size() != mcRtcJoints.size())
+    if (!out.defaultPosition.empty() && out.defaultPosition.size() != joint_size)
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml : default pos should contain all joints if specified");
   }
   else
     mc_rtc::log::error_and_throw("[PolicyConfig]: policy.yaml should contain a \"action\" entry");
     
-  for(size_t i = 0; i < mcRtcJoints.size(); ++i)
+  for(size_t i = 0; i < joint_size; ++i)
   {
     const std::string & joint = mcRtcJoints[i];
 
