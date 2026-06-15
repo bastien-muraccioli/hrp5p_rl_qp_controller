@@ -44,29 +44,12 @@ struct ObservationConvention
   /** @brief Resolve an external YAML type to an internal registered observation type. */
   std::string resolveType(const std::string & requestedType) const;
 
-  /**
-   * @brief Resolve an observation joint selector to controller joint indices.
-   *
-   * The joints parameter may be absent, a joint-group name, or an explicit
-   * list of names.
-   * - Absent: returns fallbackIndices.
-   * - Group name: checked first in AI convention groups, then in mcRtcJointGroups;
-   *   mc_rtc subsets are returned in AI convention "all" order.
-   * - Explicit list of names: mapped directly to controller indices.
-   *
-   * All returned indices are positions in controllerJointOrder.
-   */
+  /** @brief Resolve an observation joint selector to controller joint indices. */
   std::vector<int> resolveJointControllerIndices(const mc_rtc::Configuration & parameters,
                                                  const std::vector<std::string> & controllerJointOrder,
                                                  const std::vector<int> & fallbackIndices) const;
 
-  /**
-   * @brief Resolve final parameters for one observation.
-   *
-   * Convention defaults are first searched with the exact requested type, then
-   * with the internal type. Local parameters from observations.yaml always
-   * override convention defaults.
-   */
+  /** @brief Resolve final parameters for one observation. */
   mc_rtc::Configuration resolveObservationParameters(const std::string & requestedType,
                                                      const std::string & internalType,
                                                      const mc_rtc::Configuration & localParameters) const;
@@ -83,9 +66,8 @@ struct ObservationConvention
  * Joint-order convention:
  * - controllerJointOrder is mc_rtc's robot().refJointOrder().
  * - policyJointControllerIndices maps action index i to controllerJointOrder index,
- *   i.e. the policy joints in AI convention order expressed as controller indices.
- * - qZeroControllerOrder is stored in controllerJointOrder.
- * - lastActionPolicyOrder is stored in policyJointOrder (AI/policy order).
+ * - qZeroControllerOrder is stored in mc_rtc join order.
+ * - lastActionPolicyOrder is stored in RL joint order.
  */
 struct ObservationContext
 {
@@ -98,11 +80,7 @@ struct ObservationContext
   /** @brief mc_rtc controller order: robot().refJointOrder(). Used at configure time only. */
   const std::vector<std::string> & controllerJointOrder;
 
-  /** @brief Policy joints as controller indices in AI convention order.
-   *
-   * policyJointControllerIndices[i] is the index in controllerJointOrder of the
-   * i-th joint in the RL env convention action/observation order.
-   */
+  /** @brief Maps policy joints as controller indices in RL convention order */
   const std::vector<int> & policyJointControllerIndices;
 
   /** @brief Default pose expanded in controllerJointOrder. */
@@ -126,9 +104,7 @@ struct ObservationContext
   ObservationConvention convention;
 };
 
-/**
- * @brief Parsed declaration of one observation entry from observations.yaml.
- */
+/** @brief Parsed declaration of one observation entry from observations.yaml. */
 struct ObservationConfig
 {
   /** @brief Internal implementation type after convention alias resolution. */
@@ -145,12 +121,7 @@ struct ObservationConfig
    */
   std::string name;
 
-  /**
-   * @brief Number of samples stored by ObservationManager for this observation.
-   *
-   * This is intentionally not inside parameters: history is managed by
-   * ObservationManager, not by the concrete observation class.
-   */
+  /** @brief Number of samples stored by ObservationManager for this observation. */
   int history = 1;
 
   /** @brief Observation-specific parameter block. */
@@ -191,17 +162,14 @@ protected:
                   const T & fallback) const
   {
     if(!parameters.has(key))
-  {
-    return fallback;
-  }
-
+      return fallback;
     T value = fallback;
     parameters(key, value);
     return value;
   }
 
   /** @brief Read a scalar or vector scale parameter. */
-  Eigen::VectorXd readScaleVector(const mc_rtc::Configuration & parameters,
+  Eigen::VectorXd readScale(const mc_rtc::Configuration & parameters,
                                   const std::string & key,
                                   int size,
                                   double fallback) const;
@@ -211,6 +179,7 @@ protected:
   ObservationConvention convention_;
 };
 
+/** @brief Registry linking known observations to the appropriate class */
 class ObservationRegistry
 {
 public:

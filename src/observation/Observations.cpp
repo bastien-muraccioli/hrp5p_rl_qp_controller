@@ -42,7 +42,7 @@ void JointPosObservation::configure(const ObservationContext & context)
   }
 
   relativeToDefaultPose_ = readParameter<bool>(parameters, "relative_to_default_pose", true);
-  scale_ = readScaleVector(parameters, "scale", n, 1.0);
+  scale_ = readScale(parameters, "scale", n, 1.0);
 }
 
 void JointPosObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -94,7 +94,7 @@ void JointVelObservation::configure(const ObservationContext & context)
   }
 
   relativeToDefaultVelocity_ = readParameter<bool>(parameters, "relative_to_default_velocity", true);
-  scale_ = readScaleVector(parameters, "scale", n, 1.0);
+  scale_ = readScale(parameters, "scale", n, 1.0);
 }
 
 void JointVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -144,7 +144,7 @@ void ProjectedGravityObservation::configure(const ObservationContext & context)
   }
 
   bodyIndex_ = context.observationRobot.mb().bodyIndexByName(body);
-  scale_ = readScaleVector(parameters, "scale", 3, 1.0);
+  scale_ = readScale(parameters, "scale", 3, 1.0);
 }
 
 void ProjectedGravityObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -184,7 +184,7 @@ void BaseAngVelObservation::configure(const ObservationContext & context)
       context.observationRobot.name());
   }
 
-  scale_ = readScaleVector(parameters, "scale", 3, 1.0);
+  scale_ = readScale(parameters, "scale", 3, 1.0);
 }
 
 void BaseAngVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -220,7 +220,7 @@ void BaseLinVelObservation::configure(const ObservationContext & context)
       context.observationRobot.name());
   }
 
-  scale_ = readScaleVector(parameters, "scale", 3, 1.0);
+  scale_ = readScale(parameters, "scale", 3, 1.0);
 }
 
 void BaseLinVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -256,7 +256,7 @@ void LastActionObservation::configure(const ObservationContext & context)
       context.lastActionPolicyOrder.size());
   }
 
-  scale_ = readScaleVector(parameters, "scale", size_, 1.0);
+  scale_ = readScale(parameters, "scale", size_, 1.0);
 }
 
 void LastActionObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -289,7 +289,7 @@ void CommandObservation::configure(const ObservationContext & context)
       size_);
   }
 
-  scale_ = readScaleVector(parameters, "scale", size_, 1.0);
+  scale_ = readScale(parameters, "scale", size_, 1.0);
 }
 
 void CommandObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -328,7 +328,7 @@ void BaseOrientationObservation::configure(const ObservationContext & context)
 
   indexes_ = readParameter<std::vector<int>>(parameters, "index", {0,1,2});
 
-  scale_ = readScaleVector(parameters, "scale", 3, 1.0);
+  scale_ = readScale(parameters, "scale", 3, 1.0);
 }
 
 void BaseOrientationObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
@@ -363,7 +363,7 @@ void PhaseObservation::configure(const ObservationContext & context)
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
   offset_ = readParameter<double>(parameters, "offset", 0.0);
-  scale_ = readScaleVector(parameters, "scale", 2, 1.0);
+  scale_ = readScale(parameters, "scale", 2, 1.0);
 }
 
 void PhaseObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
