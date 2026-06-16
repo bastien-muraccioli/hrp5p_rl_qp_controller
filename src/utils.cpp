@@ -134,15 +134,30 @@ Eigen::VectorXd utils::getCurrentObservation(mc_control::fsm::Controller & ctl_)
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.footContactForces[i]);
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.jointAction[i]);
       for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.velCmd[i]);
+      break;
+    }
+    case 3:
+    {
+      // shift history: t-2 <- t-1 <- t
+      for (int i = ctl.HISTORY_SIZE - 1; i > 0; --i) {
+          ctl.linVel[i] = ctl.linVel[i - 1];
+          ctl.angVel[i] = ctl.angVel[i - 1];
+          ctl.projectedGravity[i] = ctl.projectedGravity[i - 1];
+          ctl.velCmd[i] = ctl.velCmd[i - 1];
+          ctl.jointPos[i] = ctl.jointPos[i - 1];
+          ctl.jointVel[i] = ctl.jointVel[i - 1];
+          ctl.jointAction[i] = ctl.jointAction[i - 1];
+      }
 
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.linVel[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.angVel[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.projectedGravity[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointPos[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointVel[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.footContactForces[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.jointAction[i]);
-      // for (int i = 0; i < ctl.HISTORY_SIZE; ++i) appendToObs(ctl.velCmd[i]);
+      ctl.initializeRLObservation(); // update t with current observation
+
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.linVel[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.angVel[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.projectedGravity[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.jointPos[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.jointVel[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.jointAction[i]);
+      for (int i = ctl.HISTORY_SIZE - 1; i >= 0; --i) appendToObs(ctl.velCmd[i]);
       break;
     }
     default:

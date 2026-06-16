@@ -1,0 +1,1447 @@
+---
+# If true, the FSM transitions are managed by an external tool
+Managed: false
+# If true and the FSM is self-managed, transitions should be triggered
+StepByStep: true
+# Change idle behaviour, if true the state is kept until transition,
+# otherwise the FSM holds the last state until transition
+IdleKeepState: false
+# Where to look for state libraries
+StatesLibraries:
+- "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@"
+- "@MC_STATES_RUNTIME_INSTALL_PREFIX@"
+# Where to look for state files
+StatesFiles:
+- "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@/data"
+- "@MC_STATES_RUNTIME_INSTALL_PREFIX@/data"
+# If true, state factory will be more verbose
+VerboseStateFactory: false
+# Additional robots to load
+robots:
+  ground:
+    module: env/ground
+
+ObserverPipelines:
+  name: "ObserverPipeline"
+  gui: true
+  log: true
+  observers:
+    - type: Encoder
+      # velocity: encoderFiniteDifferences
+      velocity: encoderVelocities
+    - type: BodySensor
+      update: true
+      bodySensor: FloatingBase
+    - type: ExternalForcesObserver
+      is_active: false
+      estimation_method: MomentumObserver    # MomentumObserver, ForceSensorBased
+      residual_gain: 50.0
+
+constraints:
+  # - type: contact
+  #   contactType: acceleration
+  - type: compoundJoint
+
+collisions:
+- type: collision
+  useMinimal: true
+
+# Implement some additional text states
+states: {}
+# Transitions map
+transitions:
+- [HRP5pRLQPController_Initial, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, RL, HRP5pRLQPController_RL, Strict]
+- [HRP5pRLQPController_RL, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, Torque, HRP5pRLQPController_Torque, Strict]
+- [HRP5pRLQPController_Torque, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_RL, Torque, HRP5pRLQPController_Torque, Strict]
+- [HRP5pRLQPController_Torque, RL, HRP5pRLQPController_RL, Strict]
+- [HRP5pRLQPController_Initial, RLPos, HRP5pRLQPController_RLPos, Strict]
+- [HRP5pRLQPController_RLPos, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, TorquePos, HRP5pRLQPController_TorquePos, Strict]
+- [HRP5pRLQPController_TorquePos, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_RLPos, TorquePos, HRP5pRLQPController_TorquePos, Strict]
+- [HRP5pRLQPController_TorquePos, RLPos, HRP5pRLQPController_RLPos, Strict]
+- [HRP5pRLQPController_Initial, RLWithoutQP, HRP5pRLQPController_RLWithoutQP, Strict]
+- [HRP5pRLQPController_RLWithoutQP, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, RLPosWithoutQP, HRP5pRLQPController_RLPosWithoutQP, Strict]
+- [HRP5pRLQPController_RLPosWithoutQP, OK, HRP5pRLQPController_Initial, Strict]
+- [HRP5pRLQPController_Initial, CompliantArm, HRP5pRLQPController_CompliantArm, Strict]
+- [HRP5pRLQPController_CompliantArm, OK, HRP5pRLQPController_Initial, Strict]
+
+# Initial state
+init: HRP5pRLQPController_Initial 
+# init: HRP5pRLQPController_CompliantArm
+
+# RL policy configuration parameters
+policy_path: ["walk.onnx", "stand.onnx", "walk2.onnx", "walk3.onnx"]  # Path to the RL policy file(s) 
+default_policy_index: 3 # Index of the default policy to use
+policies:
+# index 0 : walk.onnx
+  - is_torque_control: true
+    use_QP: true
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
+    pd_gains_ratio: 1.0
+
+    action_scale:
+      RCY: 0.5113
+      RCR: 0.4439
+      RCP: 0.4439
+      RKP: 0.2876
+      RAP: 0.4351
+      RAR: 0.0100
+
+      # Left Leg
+      LCY: 0.5113
+      LCR: 0.4439
+      LCP: 0.4439
+      LKP: 0.2876
+      LAP: 0.4351
+      LAR: 0.0100
+
+      # Waist
+      WP: 0.0065
+      WR: 0.0320
+      WY: 0.0018
+
+      # Head
+      HY: 0.0107
+      HP: 0.0105
+
+      # Right Arm
+      RSC: 0.0068
+      RSP: 0.0058
+      RSR: 0.0071
+      RSY: 0.0102
+      REP: 0.0069
+      RWRY: 0.0103
+      RWRR: 0.0103
+      RWRP: 0.0041 
+      
+      # Left Arm
+      LSC: 0.0068
+      LSP: 0.0058
+      LSR: 0.0071
+      LSY: 0.0102
+      LEP: 0.0069
+      LWRY: 0.0103
+      LWRR: 0.0103
+      LWRP: 0.0041
+    
+    kp:  
+      # Right Leg
+      RCY: 39.1138
+      RCR: 112.6436
+      RCP: 112.6436
+      RKP: 417.2479
+      RAP: 57.4529
+      RAR: 39.9007
+
+      # Left Leg
+      LCY: 39.1138
+      LCR: 112.6436
+      LCP: 112.6436
+      LKP: 417.2479
+      LAP: 57.4529
+      LAR: 39.9007
+
+      # Waist
+      WP: 278.1653
+      WR: 278.1653
+      WY: 56.3218
+
+      # Head
+      HY: 8.4202
+      HP: 8.5888
+
+      # Right Arm
+      RSC: 58.5189
+      RSP: 139.0826
+      RSR: 98.5265
+      RSY: 39.1138
+      REP: 115.5438
+      RWRY: 58.5189
+      RWRR: 58.5189
+      RWRP: 58.5189
+
+      # Right Hand  
+      RHDY: 50.0  
+      RIMP: 50.0  
+      RIPIP: 50.0  
+      RIDIP: 50.0  
+      RMMP: 50.0  
+      RMPIP: 50.0  
+      RMDIP: 50.0  
+      RTMP: 50.0  
+      RTPIP: 50.0  
+      RTDIP: 50.0 
+
+      # Left Arm
+      LSC: 58.5189
+      LSP: 139.0826
+      LSR: 98.5265
+      LSY: 39.1138
+      LEP: 115.5438
+      LWRY: 58.5189
+      LWRR: 58.5189
+      LWRP: 58.5189
+
+      # Left Hand  
+      LHDY: 50.0  
+      LIMP: 50.0  
+      LIPIP: 50.0  
+      LIDIP: 50.0  
+      LMMP: 50.0  
+      LMPIP: 50.0  
+      LMDIP: 50.0  
+      LTMP: 50.0  
+      LTPIP: 50.0  
+      LTDIP: 50.0      
+            
+    kd:  
+      # Right Leg
+      RCY: 6.2252
+      RCR: 17.9278
+      RCP: 17.9278
+      RKP: 66.4071
+      RAP: 9.1439
+      RAR: 6.3504
+
+      # Left Leg
+      LCY: 6.2252
+      LCR: 17.9278
+      LCP: 17.9278
+      LKP: 66.4071
+      LAP: 9.1439
+      LAR: 6.3504
+
+      # Waist
+      WP: 44.2714
+      WR: 44.2714
+      WY: 8.9639
+
+      # Head
+      HY: 1.3401
+      HP: 1.3670
+
+      # Right Arm
+      RSC: 9.3136
+      RSP: 22.1357
+      RSR: 15.6810
+      RSY: 6.2252
+      REP: 18.3894
+      RWRY: 9.3136
+      RWRR: 9.3136
+      RWRP: 9.3136
+
+      # Right Hand  
+      RHDY: 5.0  
+      RIMP: 5.0  
+      RIPIP: 5.0  
+      RIDIP: 5.0  
+      RMMP: 5.0  
+      RMPIP: 5.0  
+      RMDIP: 5.0  
+      RTMP: 5.0  
+      RTPIP: 5.0  
+      RTDIP: 5.0  
+
+      # Left Arm
+      LSC: 9.3136
+      LSP: 22.1357
+      LSR: 15.6810
+      LSY: 6.2252
+      LEP: 18.3894
+      LWRY: 9.3136
+      LWRR: 9.3136
+      LWRP: 9.3136
+
+      # Left Hand  
+      LHDY: 5.0  
+      LIMP: 5.0  
+      LIPIP: 5.0  
+      LIDIP: 5.0  
+      LMMP: 5.0  
+      LMPIP: 5.0  
+      LMDIP: 5.0  
+      LTMP: 5.0  
+      LTPIP: 5.0  
+      LTDIP: 5.0
+
+    # q0 must respect the joint order used in the RL framework
+    q0:
+      # Right Leg  
+      RCY: 0.0  
+      RCR: 0.0  
+      RCP: -0.46862 # -26.87°  
+      RKP: 0.87266 # 50.00°  
+      RAP: -0.40377 # -23.13°  
+      RAR: 0.0  
+      
+      # Left Leg  
+      LCY: 0.0  
+      LCR: 0.0  
+      LCP: -0.46862 # -26.87°  
+      LKP: 0.87266 # 50.00°  
+      LAP: -0.40377 # -23.13°  
+      LAR: 0.0  
+      
+      # Waist  
+      WP: 0.0  
+      WR: 0.0  
+      WY: 0.0  
+      
+      # Head  
+      HY: 0.0   
+      HP: 0.0 
+      
+      # Right Arm  
+      RSC: 0.0  
+      RSP: 1.04720 # 60.0°  
+      RSR: -0.34907 # -20.0°  
+      RSY: -0.08727 # -5.0°  
+      REP: -1.83260 # -105.0°  
+      RWRY: 0.0  
+      RWRR: -0.69813 # -40.0°  
+      RWRP: 0.0  
+      
+      # Right Hand  
+      RHDY: 0.0
+      
+      RTMP: 1.05592 # 60.5°
+      RTPIP: 0.0
+      RTDIP: 0.0
+
+      RIMP: -1.05592 # -60.5°  
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: -1.05592 # -60.5°  
+      RMPIP: 0.0  
+      RMDIP: 0.0
+      
+      # Left Arm  
+      LSC: 0.0  
+      LSP: 1.04720 # 60.0°  
+      LSR: 0.34907 # 20.0°  
+      LSY: 0.08727 # 5.0°  
+      LEP: -1.83260 # -105.0°  
+      LWRY: 0.0  
+      LWRR: 0.69813 # 40.0°  
+      LWRP: 0.0  
+      
+      # Left Hand  
+      LHDY: 0.0
+
+      LTMP: -1.05592 # -60.5°  
+      LTPIP: 0.0  
+      LTDIP: 0.0
+
+      LIMP: 1.05592 # 60.5°  
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: 1.05592 # 60.5°  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"
+
+# index 1 : stand.onnx
+  - is_torque_control: true
+    use_QP: true
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
+    pd_gains_ratio: 1.0
+
+    action_scale:
+      # Right Leg
+      RCY: 1.5339861937107369 
+      RCR: 1.331634112720747 
+      RCP: 1.331634112720747 
+      RKP: 0.8627965084054874 
+      RAP: 1.3054169611647615 
+      RAR: 1.5037311627762904
+
+      # Left Leg
+      LCY: 1.5339861937107369 
+      LCR: 1.331634112720747 
+      LCP: 1.331634112720747 
+      LKP: 0.8627965084054874 
+      LAP: 1.3054169611647615 
+      LAR: 1.5037311627762904
+      
+      # Waist
+      WP: 0.9706460364595669 
+      WR: 0.9706460364595669 
+      WY: 1.331634112720747 
+
+      # Head
+      HY: 1.6032798214935542 
+      HP: 1.5718105376485447 
+
+      # Right Arm
+      RSC: 1.0253104749507964 
+      RSP: 0.8627964768529484 
+      RSR: 1.0657029218058942 
+      RSY: 1.5339861937107369 
+      REP: 1.0385674638267632 
+      RWRY: 1.5379657124261947 
+      RWRR: 1.5379657124261947 
+      RWRP: 0.6151862849704778
+
+      #  Left Arm 
+      LSC: 1.0253104749507964 
+      LSP: 0.8627964768529484 
+      LSR: 1.0657029218058942 
+      LSY: 1.5339861937107369  
+      LEP: 1.0385674638267632
+      LWRY: 1.5379657124261947 
+      LWRR: 1.5379657124261947 
+      LWRP: 0.6151862849704778
+    
+    kp:
+      # Right Leg
+      RCY: 39.1138
+      RCR: 112.6436
+      RCP: 112.6436
+      RKP: 417.2479
+      RAP: 57.4529
+      RAR: 39.9007
+
+      # Left Leg
+      LCY: 39.1138
+      LCR: 112.6436
+      LCP: 112.6436
+      LKP: 417.2479
+      LAP: 57.4529
+      LAR: 39.9007
+
+      # Waist
+      WP: 278.1653
+      WR: 278.1653
+      WY: 56.3218
+
+      # Head
+      HY: 8.4202
+      HP: 8.5888
+
+      # Right Arm
+      RSC: 58.5189
+      RSP: 139.0826
+      RSR: 98.5265
+      RSY: 39.1138
+      REP: 115.5438
+      RWRY: 58.5189
+      RWRR: 58.5189
+      RWRP: 58.5189
+
+      # Right Hand  
+      RHDY: 10.0  
+      RIMP: 10.0  
+      RIPIP: 10.0  
+      RIDIP: 10.0  
+      RMMP: 10.0  
+      RMPIP: 10.0  
+      RMDIP: 10.0  
+      RTMP: 10.0  
+      RTPIP: 10.0  
+      RTDIP: 10.0 
+
+      # Left Arm
+      LSC: 58.5189
+      LSP: 139.0826
+      LSR: 98.5265
+      LSY: 39.1138
+      LEP: 115.5438
+      LWRY: 58.5189
+      LWRR: 58.5189
+      LWRP: 58.5189 
+
+      # Left Hand  
+      LHDY: 10.0  
+      LIMP: 10.0  
+      LIPIP: 10.0  
+      LIDIP: 10.0  
+      LMMP: 10.0  
+      LMPIP: 10.0  
+      LMDIP: 10.0  
+      LTMP: 10.0  
+      LTPIP: 10.0  
+      LTDIP: 10.0  
+            
+    kd:
+      # Right Leg
+      RCY: 4.5651
+      RCR: 13.1470
+      RCP: 13.1470
+      RKP: 48.6985
+      RAP: 6.7055
+      RAR: 4.6570
+
+      # Left Leg
+      LCY: 4.5651
+      LCR: 13.1470
+      LCP: 13.1470
+      LKP: 48.6985
+      LAP: 6.7055
+      LAR: 4.6570
+
+      # Waist
+      WP: 32.4657
+      WR: 32.4657
+      WY: 6.5735
+
+      # Head
+      HY: 0.9828
+      HP: 1.0024
+
+      # Right Arm
+      RSC: 6.8299
+      RSP: 16.2328
+      RSR: 11.4994
+      RSY: 4.5651
+      REP: 13.4855
+      RWRY: 6.8299
+      RWRR: 6.8299
+      RWRP: 6.8299
+
+      # Right Hand  
+      RHDY: 2.0  
+      RIMP: 2.0  
+      RIPIP: 2.0  
+      RIDIP: 2.0  
+      RMMP: 2.0  
+      RMPIP: 2.0  
+      RMDIP: 2.0  
+      RTMP: 2.0  
+      RTPIP: 2.0  
+      RTDIP: 2.0 
+
+      # Left Arm
+      LSC: 6.8299
+      LSP: 16.2328
+      LSR: 11.4994
+      LSY: 4.5651
+      LEP: 13.4855
+      LWRY: 6.8299
+      LWRR: 6.8299
+      LWRP: 6.8299
+
+      # Left Hand  
+      LHDY: 2.0  
+      LIMP: 2.0  
+      LIPIP: 2.0  
+      LIDIP: 2.0  
+      LMMP: 2.0  
+      LMPIP: 2.0  
+      LMDIP: 2.0  
+      LTMP: 2.0  
+      LTPIP: 2.0  
+      LTDIP: 2.0
+
+    # q0 must respect the joint order used in the RL framework
+    q0:
+      # Right Leg  
+      RCY: 0.0  
+      RCR: 0.0  
+      RCP: -0.4690 
+      RKP: 0.8727   
+      RAP: -0.4037   
+      RAR: 0.0  
+      
+      # Left Leg  
+      LCY: 0.0  
+      LCR: 0.0  
+      LCP: -0.4690   
+      LKP: 0.8727   
+      LAP: -0.4037  
+      LAR: 0.0  
+      
+      # Waist  
+      WP: 0.0  
+      WR: 0.0  
+      WY: 0.0  
+      
+      # Head  
+      HY: 0.0   
+      HP: 0.0 
+      
+      # Right Arm  
+      RSC: 0.0  
+      RSP: 1.0472 
+      RSR: -0.3491
+      RSY: -0.0873 
+      REP: -1.8326
+      RWRY: 0.0  
+      RWRR: -0.6981
+      RWRP: 0.0  
+      
+      # Right Hand  
+      RHDY: 0.0
+      RTMP: -1.0559
+      RTPIP: 0.0
+      RTDIP: 0.0
+      RIMP: -1.0559 
+      RIPIP: 0.0  
+      RIDIP: 0.0  
+      RMMP: 1.0559 
+      RMPIP: 0.0  
+      RMDIP: 0.0
+      
+      # Left Arm  
+      LSC: 0.0  
+      LSP: 1.0472
+      LSR: 0.3491
+      LSY: 0.0873 
+      LEP: -1.8326 
+      LWRY: 0.0  
+      LWRR: 0.6981 
+      LWRP: 0.0  
+      
+      # Left Hand  
+      LHDY: 0.0
+      LTMP: 1.0559
+      LTPIP: 0.0  
+      LTDIP: 0.0
+      LIMP: 1.0559
+      LIPIP: 0.0  
+      LIDIP: 0.0  
+      LMMP: -1.0559  
+      LMPIP: 0.0  
+      LMDIP: 0.0  
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"
+
+# index 2 : walk2.onnx
+  - is_torque_control: true
+    use_QP: true
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
+    pd_gains_ratio: 1.0
+
+    action_scale:
+      # Right Leg
+      RCY: 1.0226574624738247
+      RCR: 0.8877560751471647
+      RCP: 0.8877560751471647
+      RKP: 0.5751976722703249
+      RAP: 0.8702779741098411
+      RAR: 1.0024874418508603
+      # Left Leg
+      LCY: 1.0226574624738247
+      LCR: 0.8877560751471647
+      LCP: 0.8877560751471647
+      LKP: 0.5751976722703249
+      LAP: 0.8702779741098411
+      LAR: 1.0024874418508603
+      # Waist
+      WP: 0.6470973576397113
+      WR: 0.6470973576397113
+      WY: 0.8877560751471647
+      # Head
+      HY: 1.0688532143290361
+      HP: 1.0478736917656966
+      # Right Arm
+      RSC: 0.6835403166338644
+      RSP: 0.575197651235299
+      RSR: 0.7104686145372628
+      RSY: 1.0226574624738247
+      REP: 0.6923783092178423
+      RWRY: 1.0253104749507966
+      RWRR: 1.0253104749507966
+      RWRP: 0.4101241899803186
+      # Left Arm
+      LSC: 0.6835403166338644
+      LSP: 0.575197651235299
+      LSR: 0.7104686145372628
+      LSY: 1.0226574624738247
+      LWRY: 1.0253104749507966
+      LEP: 0.6923783092178423
+      LWRR: 1.0253104749507966
+      LWRP: 0.4101241899803186
+    
+    kp:
+      # Right Leg
+      RCY: 39.1138
+      RCR: 112.6436
+      RCP: 112.6436
+      RKP: 417.2479
+      RAP: 57.4529
+      RAR: 39.9007
+
+      # Left Leg
+      LCY: 39.1138
+      LCR: 112.6436
+      LCP: 112.6436
+      LKP: 417.2479
+      LAP: 57.4529
+      LAR: 39.9007
+
+      # Waist
+      WP: 278.1653
+      WR: 278.1653
+      WY: 56.3218
+
+      # Head
+      HY: 8.4202
+      HP: 8.5888
+
+      # Right Arm
+      RSC: 58.5189
+      RSP: 139.0826
+      RSR: 98.5265
+      RSY: 39.1138
+      REP: 115.5438
+      RWRY: 58.5189
+      RWRR: 58.5189
+      RWRP: 58.5189
+
+      # Right Hand  
+      RHDY: 10.0  
+      RIMP: 10.0  
+      RIPIP: 10.0  
+      RIDIP: 10.0  
+      RMMP: 10.0  
+      RMPIP: 10.0  
+      RMDIP: 10.0  
+      RTMP: 10.0  
+      RTPIP: 10.0  
+      RTDIP: 10.0 
+
+      # Left Arm
+      LSC: 58.5189
+      LSP: 139.0826
+      LSR: 98.5265
+      LSY: 39.1138
+      LEP: 115.5438
+      LWRY: 58.5189
+      LWRR: 58.5189
+      LWRP: 58.5189 
+
+      # Left Hand  
+      LHDY: 10.0  
+      LIMP: 10.0  
+      LIPIP: 10.0  
+      LIDIP: 10.0  
+      LMMP: 10.0  
+      LMPIP: 10.0  
+      LMDIP: 10.0  
+      LTMP: 10.0  
+      LTPIP: 10.0  
+      LTDIP: 10.0  
+            
+    kd:
+      # Right Leg
+      RCY: 6.2252
+      RCR: 17.9278
+      RCP: 17.9278
+      RKP: 66.4071
+      RAP: 9.1439
+      RAR: 6.3504
+
+      # Left Leg
+      LCY: 6.2252
+      LCR: 17.9278
+      LCP: 17.9278
+      LKP: 66.4071
+      LAP: 9.1439
+      LAR: 6.3504
+
+      # Waist
+      WP: 44.2714
+      WR: 44.2714
+      WY: 8.9639
+
+      # Head
+      HY: 1.3401
+      HP: 1.3670
+
+      # Right Arm
+      RSC: 9.3136
+      RSP: 22.1357
+      RSR: 15.6810
+      RSY: 6.2252
+      REP: 18.3894
+      RWRY: 9.3136
+      RWRR: 9.3136
+      RWRP: 9.3136
+
+      # Right Hand  
+      RHDY: 2.0  
+      RIMP: 2.0  
+      RIPIP: 2.0  
+      RIDIP: 2.0  
+      RMMP: 2.0  
+      RMPIP: 2.0  
+      RMDIP: 2.0  
+      RTMP: 2.0  
+      RTPIP: 2.0  
+      RTDIP: 2.0 
+
+      # Left Arm
+      LSC: 9.3136
+      LSP: 22.1357
+      LSR: 15.6810
+      LSY: 6.2252
+      LEP: 18.3894
+      LWRY: 9.3136
+      LWRR: 9.3136
+      LWRP: 9.3136
+
+      # Left Hand  
+      LHDY: 2.0  
+      LIMP: 2.0  
+      LIPIP: 2.0  
+      LIDIP: 2.0  
+      LMMP: 2.0  
+      LMPIP: 2.0  
+      LMDIP: 2.0  
+      LTMP: 2.0  
+      LTPIP: 2.0  
+      LTDIP: 2.0
+
+    # q0 must respect the joint order used in the RL framework
+    q0:
+      # Right Leg
+      RCY: 0.0
+      RCR: 0.0
+      RCP: -0.46862 # -26.87°
+      RKP: 0.87266 # 50.00°
+      RAP: -0.40377 # -23.13°
+      RAR: 0.0
+
+      # Left Leg
+      LCY: 0.0
+      LCR: 0.0
+      LCP: -0.46862 # -26.87°
+      LKP: 0.87266 # 50.00°
+      LAP: -0.40377 # -23.13°
+      LAR: 0.0
+
+      # Waist
+      WP: 0.0
+      WR: 0.0
+      WY: 0.0
+
+      # Head
+      HY: 0.0
+      HP: 0.0
+
+      # Right Arm
+      RSC: 0.0
+      RSP: 1.04720 # 60.0°
+      RSR: -0.34907 # -20.0°
+      RSY: -0.08727 # -5.0°
+      REP: -1.83260 # -105.0°
+      RWRY: 0.0
+      RWRR: -0.34907 # -20.0°
+      RWRP: 0.0
+
+      # Right Hand
+      RHDY: 0.0
+      RIMP: -1.05592 # -60.5°
+      RIPIP: 0.0
+      RIDIP: 0.0
+      RMMP: -1.05592 # -60.5°
+      RMPIP: 0.0
+      RMDIP: 0.0
+      RTMP: 1.05592 # 60.5°
+      RTPIP: 0.0
+      RTDIP: 0.0
+
+      # Left Arm
+      LSC: 0.0
+      LSP: 1.04720 # 60.0°
+      LSR: 0.34907 # 20.0°
+      LSY: 0.08727 # 5.0°
+      LEP: -1.83260 # -105.0°
+      LWRY: 0.0
+      LWRR: 0.34907 # 20.0°
+      LWRP: 0.0
+
+      # Left Hand
+      LHDY: 0.0
+      LIMP: 1.05592 # 60.5°
+      LIPIP: 0.0
+      LIDIP: 0.0
+      LMMP: 1.05592 # 60.5°
+      LMPIP: 0.0
+      LMDIP: 0.0
+      LTMP: -1.05592 # -60.5°
+      LTPIP: 0.0
+      LTDIP: 0.0
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"
+# index 3 : walk3.onnx
+  - is_torque_control: true
+    use_QP: true
+    policy_step_size: 0.02 # Policy step size in seconds
+    physics_step_size: 0.0025 # Physics step size in seconds
+    pd_gains_ratio: 1.0
+
+    action_scale:
+      # Right Leg
+      RCY: 1.0226574624738247
+      RCR: 0.8877560751471647
+      RCP: 0.8877560751471647
+      RKP: 0.5751976722703249
+      RAP: 0.8702779741098411
+      RAR: 1.0024874418508603
+      # Left Leg
+      LCY: 1.0226574624738247
+      LCR: 0.8877560751471647
+      LCP: 0.8877560751471647
+      LKP: 0.5751976722703249
+      LAP: 0.8702779741098411
+      LAR: 1.0024874418508603
+      # Waist
+      WP: 0.6470973576397113
+      WR: 0.6470973576397113
+      WY: 0.8877560751471647
+      # Head
+      HY: 1.0688532143290361
+      HP: 1.0478736917656966
+      # Right Arm
+      RSC: 0.6835403166338644
+      RSP: 0.575197651235299
+      RSR: 0.7104686145372628
+      RSY: 1.0226574624738247
+      REP: 0.6923783092178423
+      RWRY: 1.0253104749507966
+      RWRR: 1.0253104749507966
+      RWRP: 0.4101241899803186
+      # Left Arm
+      LSC: 0.6835403166338644
+      LSP: 0.575197651235299
+      LSR: 0.7104686145372628
+      LSY: 1.0226574624738247
+      LWRY: 1.0253104749507966
+      LEP: 0.6923783092178423
+      LWRR: 1.0253104749507966
+      LWRP: 0.4101241899803186
+    
+    kp:
+      # Right Leg
+      RCY: 39.1138
+      RCR: 112.6436
+      RCP: 112.6436
+      RKP: 417.2479
+      RAP: 57.4529
+      RAR: 39.9007
+
+      # Left Leg
+      LCY: 39.1138
+      LCR: 112.6436
+      LCP: 112.6436
+      LKP: 417.2479
+      LAP: 57.4529
+      LAR: 39.9007
+
+      # Waist
+      WP: 278.1653
+      WR: 278.1653
+      WY: 56.3218
+
+      # Head
+      HY: 8.4202
+      HP: 8.5888
+
+      # Right Arm
+      RSC: 58.5189
+      RSP: 139.0826
+      RSR: 98.5265
+      RSY: 39.1138
+      REP: 115.5438
+      RWRY: 58.5189
+      RWRR: 58.5189
+      RWRP: 58.5189
+
+      # Right Hand  
+      RHDY: 10.0  
+      RIMP: 10.0  
+      RIPIP: 10.0  
+      RIDIP: 10.0  
+      RMMP: 10.0  
+      RMPIP: 10.0  
+      RMDIP: 10.0  
+      RTMP: 10.0  
+      RTPIP: 10.0  
+      RTDIP: 10.0 
+
+      # Left Arm
+      LSC: 58.5189
+      LSP: 139.0826
+      LSR: 98.5265
+      LSY: 39.1138
+      LEP: 115.5438
+      LWRY: 58.5189
+      LWRR: 58.5189
+      LWRP: 58.5189 
+
+      # Left Hand  
+      LHDY: 10.0  
+      LIMP: 10.0  
+      LIPIP: 10.0  
+      LIDIP: 10.0  
+      LMMP: 10.0  
+      LMPIP: 10.0  
+      LMDIP: 10.0  
+      LTMP: 10.0  
+      LTPIP: 10.0  
+      LTDIP: 10.0  
+            
+    kd:
+      # Right Leg
+      RCY: 6.2252
+      RCR: 17.9278
+      RCP: 17.9278
+      RKP: 66.4071
+      RAP: 9.1439
+      RAR: 6.3504
+
+      # Left Leg
+      LCY: 6.2252
+      LCR: 17.9278
+      LCP: 17.9278
+      LKP: 66.4071
+      LAP: 9.1439
+      LAR: 6.3504
+
+      # Waist
+      WP: 44.2714
+      WR: 44.2714
+      WY: 8.9639
+
+      # Head
+      HY: 1.3401
+      HP: 1.3670
+
+      # Right Arm
+      RSC: 9.3136
+      RSP: 22.1357
+      RSR: 15.6810
+      RSY: 6.2252
+      REP: 18.3894
+      RWRY: 9.3136
+      RWRR: 9.3136
+      RWRP: 9.3136
+
+      # Right Hand  
+      RHDY: 2.0  
+      RIMP: 2.0  
+      RIPIP: 2.0  
+      RIDIP: 2.0  
+      RMMP: 2.0  
+      RMPIP: 2.0  
+      RMDIP: 2.0  
+      RTMP: 2.0  
+      RTPIP: 2.0  
+      RTDIP: 2.0 
+
+      # Left Arm
+      LSC: 9.3136
+      LSP: 22.1357
+      LSR: 15.6810
+      LSY: 6.2252
+      LEP: 18.3894
+      LWRY: 9.3136
+      LWRR: 9.3136
+      LWRP: 9.3136
+
+      # Left Hand  
+      LHDY: 2.0  
+      LIMP: 2.0  
+      LIPIP: 2.0  
+      LIDIP: 2.0  
+      LMMP: 2.0  
+      LMPIP: 2.0  
+      LMDIP: 2.0  
+      LTMP: 2.0  
+      LTPIP: 2.0  
+      LTDIP: 2.0
+
+    # q0 must respect the joint order used in the RL framework
+    q0:
+      # Right Leg
+      RCY: 0.0
+      RCR: 0.0
+      RCP: -0.46862 # -26.87°
+      RKP: 0.87266 # 50.00°
+      RAP: -0.40377 # -23.13°
+      RAR: 0.0
+
+      # Left Leg
+      LCY: 0.0
+      LCR: 0.0
+      LCP: -0.46862 # -26.87°
+      LKP: 0.87266 # 50.00°
+      LAP: -0.40377 # -23.13°
+      LAR: 0.0
+
+      # Waist
+      WP: 0.0
+      WR: 0.0
+      WY: 0.0
+
+      # Head
+      HY: 0.0
+      HP: 0.0
+
+      # Right Arm
+      RSC: 0.0
+      RSP: 1.04720 # 60.0°
+      RSR: -0.34907 # -20.0°
+      RSY: -0.08727 # -5.0°
+      REP: -1.83260 # -105.0°
+      RWRY: 0.0
+      RWRR: -0.34907 # -20.0°
+      RWRP: 0.0
+
+      # Right Hand
+      RHDY: 0.0
+      RIMP: -1.05592 # -60.5°
+      RIPIP: 0.0
+      RIDIP: 0.0
+      RMMP: -1.05592 # -60.5°
+      RMPIP: 0.0
+      RMDIP: 0.0
+      RTMP: 1.05592 # 60.5°
+      RTPIP: 0.0
+      RTDIP: 0.0
+
+      # Left Arm
+      LSC: 0.0
+      LSP: 1.04720 # 60.0°
+      LSR: 0.34907 # 20.0°
+      LSY: 0.08727 # 5.0°
+      LEP: -1.83260 # -105.0°
+      LWRY: 0.0
+      LWRR: 0.34907 # 20.0°
+      LWRP: 0.0
+
+      # Left Hand
+      LHDY: 0.0
+      LIMP: 1.05592 # 60.5°
+      LIPIP: 0.0
+      LIDIP: 0.0
+      LMMP: 1.05592 # 60.5°
+      LMPIP: 0.0
+      LMDIP: 0.0
+      LTMP: -1.05592 # -60.5°
+      LTPIP: 0.0
+      LTDIP: 0.0
+
+    # The order of joints in action vector (policy output)
+    ref_joint_order:
+      # Right Leg
+      - "RCY"
+      - "RCR"
+      - "RCP"
+      - "RKP"
+      - "RAP"
+      - "RAR"
+
+      # Left Leg
+      - "LCY"
+      - "LCR"
+      - "LCP"
+      - "LKP"
+      - "LAP"
+      - "LAR"
+
+      # Waist
+      - "WP"
+      - "WR"
+      - "WY"
+
+      # Head
+      - "HY"
+      - "HP"
+
+      # Right Arm
+      - "RSC"
+      - "RSP"
+      - "RSR"
+      - "RSY"
+      - "REP"
+      - "RWRY"
+      - "RWRR"
+      - "RWRP"
+
+      # Left Arm
+      - "LSC"
+      - "LSP"
+      - "LSR"
+      - "LSY"
+      - "LEP"
+      - "LWRY"
+      - "LWRR"
+      - "LWRP"
+
+high_kp:
+  RCY: 5400
+  RCR: 12925
+  RCP: 16000
+  RKP: 36000
+  RAP: 8000
+  RAR: 2244
+
+  LCY: 5400
+  LCR: 12925
+  LCP: 16000
+  LKP: 36000
+  LAP: 8000
+  LAR: 2244
+
+  WP: 8000
+  WR: 8000
+  WY: 8000
+
+  HY: 1311
+  HP: 1311
+
+  RSC: 3235
+  RSP: 3235
+  RSR: 5586
+  RSY: 1429
+  REP: 8705
+  RWRY: 1386
+  RWRR: 1386
+  RWRP: 1492
+  RHDY: 693
+
+  RTMP: 693
+  RTPIP: 693
+  RTDIP: 693
+
+  RIMP: 693
+  RIPIP: 693
+  RIDIP: 693
+
+  RMMP: 693
+  RMPIP: 693
+  RMDIP: 693
+
+  LSC: 3235
+  LSP: 3235
+  LSR: 5586
+  LSY: 1429
+  LEP: 8705
+  LWRY: 1386
+  LWRR: 1386
+  LWRP: 1492
+  LHDY: 693
+
+  LTMP: 693
+  LTPIP: 693
+  LTDIP: 693
+
+  LIMP: 693
+  LIPIP: 693
+  LIDIP: 693
+
+  LMMP: 693
+  LMPIP: 693
+  LMDIP: 693
+
+high_kd:
+  RCY: 54
+  RCR: 103.40
+  RCP: 160.00
+  RKP: 360.00
+  RAP: 80.00
+  RAR: 22.44
+
+  LCY: 54
+  LCR: 103.40
+  LCP: 160.00
+  LKP: 360.00
+  LAP: 80.00
+  LAR: 22.44
+
+  WP: 80.00
+  WR: 80.00
+  WY: 80.00
+
+  HY: 13.11
+  HP: 13.11
+
+  RSC: 32.35
+  RSP: 32.35
+  RSR: 55.86
+  RSY: 10.83
+  REP: 87.05
+  RWRY: 13.87
+  RWRR: 13.87
+  RWRP: 11.19
+  RHDY: 6.93
+
+  RTMP: 6.93
+  RTPIP: 6.93
+  RTDIP: 6.93
+
+  RIMP: 6.93
+  RIPIP: 6.93
+  RIDIP: 6.93
+
+  RMMP: 6.93
+  RMPIP: 6.93
+  RMDIP: 6.93
+
+  LSC: 32.35
+  LSP: 32.35
+  LSR: 55.86
+  LSY: 10.83
+  LEP: 87.05
+  LWRY: 13.87
+  LWRR: 13.87
+  LWRP: 11.19
+  LHDY: 6.93
+
+  LTMP: 6.93
+  LTPIP: 6.93
+  LTDIP: 6.93
+
+  LIMP: 6.93
+  LIPIP: 6.93
+  LIDIP: 6.93
+
+  LMMP: 6.93
+  LMPIP: 6.93
+  LMDIP: 6.93

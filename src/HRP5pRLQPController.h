@@ -2,6 +2,7 @@
 
 #include <mc_control/fsm/Controller.h>
 #include <mc_tasks/TorqueJointTask.h>
+#include <mc_tasks/CompliantPostureTask.h>
 #include <SpaceVecAlg/EigenTypedef.h>
 #include <SpaceVecAlg/SpaceVecAlg>
 
@@ -23,6 +24,7 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   void reset(const mc_control::ControllerResetData & reset_data) override;
   void activateQPControl(bool activate);
   void activateTorqueControl(bool activate);
+  void activateFloatingBaseReal(bool activate);
   void activateContactConstraints(bool activate);
   void activateExternalTorqueComputation(bool activate);
   void initializeRLObservation();
@@ -30,6 +32,7 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   // Task
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
   std::shared_ptr<mc_tasks::PostureTask> postureTask;
+  std::shared_ptr<mc_tasks::CompliantPostureTask> compliantPostureTask;
   std::map<std::string, std::vector<double>> defaultPostureTarget; // q0
   
   int nbActuatedJoints = 0;
@@ -90,6 +93,7 @@ private:
   // Mode switching
   bool useQP_ = true;
   bool isTorqueControl_ = false;
+  bool isFloatingBaseReal_ = false;
   bool controlModeChanged_ = false;
 
   // Constraint configuration
@@ -116,6 +120,8 @@ private:
   // RL
   std::vector<std::string> policyPaths_;
   Eigen::VectorXd tau_rl_;
+  Eigen::VectorXd qdot_rl_integrated_;
+  Eigen::VectorXd q_rl_integrated_;
 
   sva::PTransformd controlFloatingBase_;
   sva::PTransformd realFloatingBase_;
@@ -124,4 +130,7 @@ private:
 
   bool contactModeChanged_ = true;
   bool contactConstraintsAreEnabled_ = true;
+
+  std::vector<int> refJointToDofIndex_;
+  
 };

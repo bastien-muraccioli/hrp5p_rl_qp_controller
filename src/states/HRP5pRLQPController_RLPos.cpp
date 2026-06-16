@@ -9,6 +9,7 @@ void HRP5pRLQPController_RLPos::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.activateQPControl(true);
   ctl.activateTorqueControl(false);
+  ctl.activateFloatingBaseReal(true);
   ctl.activateContactConstraints(false);
   ctl.activateExternalTorqueComputation(true);
   ctl.solver().addTask(ctl.torqueJointTask);
@@ -29,6 +30,7 @@ void HRP5pRLQPController_RLPos::teardown(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.solver().removeTask(ctl.torqueJointTask);
   ctl.activateExternalTorqueComputation(false);
+  ctl.activateFloatingBaseReal(false);
 }
 
 EXPORT_SINGLE_STATE("HRP5pRLQPController_RLPos", HRP5pRLQPController_RLPos)
