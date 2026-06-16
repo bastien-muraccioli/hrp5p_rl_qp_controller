@@ -54,18 +54,18 @@ bool HRP5pRLQPController::run()
 
   if(contactModeChanged_)
   {
-    // if(contactConstraintsAreEnabled_)
-    // {
-    //   Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
-    //   // Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Zero();
-    //   // footcontact_dof.head<3>() = Eigen::Vector3d::Ones(); // Only enforce the position constraint for the foot contact
-    //   addContact({robot.name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
-    //   addContact({robot.name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
-    // }
-    // else
-    // {
-    //   clearContacts();
-    // }
+    if(contactConstraintsAreEnabled_)
+    {
+      Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
+      // Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Zero();
+      // footcontact_dof.head<3>() = Eigen::Vector3d::Ones(); // Only enforce the position constraint for the foot contact
+      addContact({robot.name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
+      addContact({robot.name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
+    }
+    else
+    {
+      clearContacts();
+    }
     contactModeChanged_ = false;
   }
   bool run = manageModeSwitching();
@@ -288,69 +288,8 @@ bool HRP5pRLQPController::byPassQPControl()
   // --- Position control branch ---
   if(!isTorqueControl_)
   {
-    auto & real_robot = realRobot(robots()[0].name());
-    Eigen::VectorXd tau_rl_w_floating_base = Eigen::VectorXd::Zero(real_robot.mb().nrDof());
-
-    for(int i = 0; i < nbActuatedJoints; ++i)
-    {
-      if(refJointToDofIndex_[i] < 0) { continue; }
-
-      const int mbcIndex = robot().mb().jointIndexByName(jointNames[i]);
-      const double q     = q_mbc[mbcIndex][0];
-      const double q_dot = q_dot_mbc[mbcIndex][0];
-      q_rl_integrated_(i)    = q;
-      qdot_rl_integrated_(i) = q_dot;
-      tau_rl_(i) = kp_(i) * (q_rl(i) - q) - kd_(i) * q_dot;
-      tau_rl_w_floating_base(refJointToDofIndex_[i]) = tau_rl_(i);
-    }
-
-    // Step 2: compute dynamics on real_robot (state is valid)
-    rbd::ForwardDynamics fd(robot().mb());
-    fd.computeH(robot().mb(), robot().mbc());
-    fd.computeC(robot().mb(), robot().mbc());
-    Eigen::MatrixXd M  = fd.H();
-    Eigen::VectorXd Cg = fd.C();
-
-    mc_rtc::log::info("M finite: {}", M.allFinite());
-    mc_rtc::log::info("C finite: {}", Cg.allFinite());
-    mc_rtc::log::info("tau finite: {}", tau_rl_w_floating_base.allFinite());
-    mc_rtc::log::info("ext finite: {}", real_robot.externalTorques().allFinite());
-
-    Eigen::VectorXd content = tau_rl_w_floating_base
-                            + real_robot.externalTorques()
-                            - Cg;
-
-    // Step 3: solve for accelerations
-    Eigen::VectorXd qddot_full = M.llt().solve(content);
-    mc_rtc::log::info("qddot_fb: {}", qddot_full.head(6).transpose());
-    mc_rtc::log::info("tau_fb: {}", tau_rl_w_floating_base.head(6).transpose());
-    mc_rtc::log::info("tau_ext_fb: {}", real_robot.externalTorques().head(6).transpose());
-
-    // Step 4: extract per-joint accelerations
-    Eigen::VectorXd qddot_rl_integrated = Eigen::VectorXd::Zero(nbActuatedJoints);
-    for(int i = 0; i < nbActuatedJoints; i++)
-    {
-      if(refJointToDofIndex_[i] < 0) { continue; }
-      qddot_rl_integrated(i) = qddot_full(refJointToDofIndex_[i]);
-    }
-
-    // Step 5: integrate
-    qdot_rl_integrated_ += qddot_rl_integrated * timeStep;
-    q_rl_integrated_    += qdot_rl_integrated_ * timeStep;
-
-    // Step 6: write integrated state back to control robot
-    // robot().mbc() is what the framework reads for sending commands
-    for(int i = 0; i < nbActuatedJoints; ++i)
-    {
-      const std::string & jointName = jointNames[i];
-      if(!robot().hasJoint(jointName)) { continue; }
-      const int mbcIndex = robot().mb().jointIndexByName(jointName);
-      if(robot().mbc().q[mbcIndex].empty()) { continue; }
-      robot().mbc().q[mbcIndex][0]     = q_rl_integrated_(i);
-      robot().mbc().alpha[mbcIndex][0] = qdot_rl_integrated_(i);
-    }
-
-    return true;
+    mc_rtc::log::info("[HRP5pRLQPController] byPassQP can't be used in position control mode, returning to QP control");
+    return false;
   }
 
   // --- Torque control branch ---
@@ -461,14 +400,6 @@ void HRP5pRLQPController::addGui()
       mc_rtc::gui::Label("Current Control Mode", [this]()
         {
           return isTorqueControl_ ? "Torque Control" : "Position Control";
-        }),
-      mc_rtc::gui::Button("Activate real floating base mode", [this]()
-        {
-          controlModeChanged_ = true;
-          isFloatingBaseReal_ = !isFloatingBaseReal_;
-        }),
-      mc_rtc::gui::Label("Floating base mode", [this]()
-        {          return isFloatingBaseReal_ ? "Real" : "Control";
         }),
       mc_rtc::gui::Button("Toggle QP Control", [this]()
         {
@@ -606,22 +537,6 @@ bool HRP5pRLQPController::manageModeSwitching()
       mc_rtc::log::info("[HRP5pRLQPController] Switching to Position Control");
       datastore().assign<std::string>("ControlMode", "Position");
     }
-
-    if(isFloatingBaseReal_)
-    {
-      solver().removeConstraintSet(dynamicsConstraint);
-      dynamicsConstraint = mc_rtc::unique_ptr<mc_solver::DynamicsConstraint>(
-        new mc_solver::DynamicsConstraint(robots(), 0, {diPercent_, dsPercent_, 0.0, zeta_jointLimit_, lambda_jointLimit_}, velPercent_, true, true));
-      solver().addConstraintSet(dynamicsConstraint);
-      mc_rtc::log::info("[HRP5pRLQPController] Reconfigured dynamics constraint for position control with real floating base");
-    }
-    else
-    {
-      solver().removeConstraintSet(dynamicsConstraint);
-      dynamicsConstraint = mc_rtc::unique_ptr<mc_solver::DynamicsConstraint>(
-        new mc_solver::DynamicsConstraint(robots(), 0, {diPercent_, dsPercent_, 0.0, zeta_jointLimit_, lambda_jointLimit_}, velPercent_, true, false));
-      solver().addConstraintSet(dynamicsConstraint);
-    }
     controlModeChanged_ = false;
   }  
 
@@ -632,17 +547,9 @@ bool HRP5pRLQPController::manageModeSwitching()
     return mc_control::fsm::Controller::run(
           mc_solver::FeedbackType::ClosedLoopIntegrateReal);
   }
-  else if(isFloatingBaseReal_)
-  {
-    return mc_control::fsm::Controller::run(
-          mc_solver::FeedbackType::ClosedLoopIntegrateReal);
-    
-  }
   else 
   {
-    return mc_control::fsm::Controller::run(
-      mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
-    // return mc_control::fsm::Controller::run();
+    return mc_control::fsm::Controller::run();
   }
 }
 
@@ -651,27 +558,11 @@ void HRP5pRLQPController::activateTorqueControl(bool activate)
   if(activate && !isTorqueControl_)
   {
     isTorqueControl_ = true;
-    isFloatingBaseReal_ = false;
     controlModeChanged_ = true;
   }
   else if(!activate && isTorqueControl_)
   {
     isTorqueControl_ = false;
-    controlModeChanged_ = true;
-  }
-}
-
-void HRP5pRLQPController::activateFloatingBaseReal(bool activate)
-{
-  if(activate && !isFloatingBaseReal_)
-  {
-    isFloatingBaseReal_ = true;
-    isTorqueControl_ = false;
-    controlModeChanged_ = true;
-  }
-  else if(!activate && isFloatingBaseReal_)
-  {
-    isFloatingBaseReal_ = false;
     controlModeChanged_ = true;
   }
 }

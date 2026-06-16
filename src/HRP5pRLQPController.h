@@ -24,7 +24,6 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   void reset(const mc_control::ControllerResetData & reset_data) override;
   void activateQPControl(bool activate);
   void activateTorqueControl(bool activate);
-  void activateFloatingBaseReal(bool activate);
   void activateContactConstraints(bool activate);
   void activateExternalTorqueComputation(bool activate);
   void initializeRLObservation();
@@ -93,7 +92,6 @@ private:
   // Mode switching
   bool useQP_ = true;
   bool isTorqueControl_ = false;
-  bool isFloatingBaseReal_ = false;
   bool controlModeChanged_ = false;
 
   // Constraint configuration
