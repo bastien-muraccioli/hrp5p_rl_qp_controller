@@ -1,9 +1,9 @@
-name: walking_better_h1
+name: walking_h1
 
-onnx: walking_better_h1.onnx
+onnx: walking_h1.onnx
 
 action:
-  joints: legs
+  joints: all
 
 control:
   use_QP: true

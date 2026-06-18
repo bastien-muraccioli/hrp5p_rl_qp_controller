@@ -87,6 +87,7 @@ Eigen::VectorXd ObservationManager::compute(const ObservationContext & context)
   for(size_t i = 0; i < entries_.size(); ++i)
   {
     Entry & entry = entries_[i];
+    // mc_rtc::log::warning("[ENtry] {} size {}", entry.observation->type(), entry.observation->size());
 
     Eigen::VectorXd current = Eigen::VectorXd::Zero(entry.observation->size());
     entry.observation->compute(context, current);

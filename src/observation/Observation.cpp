@@ -127,6 +127,7 @@ std::vector<int> ObservationConvention::resolveJointControllerIndices(
       out.reserve(rlIt->second.size());
       for(size_t i = 0; i < rlIt->second.size(); ++i)
         out.push_back(nameToIdx(rlIt->second[i]));
+      mc_rtc::log::warning("B: {} {}", out, groupName);
       return out;
     }
   }

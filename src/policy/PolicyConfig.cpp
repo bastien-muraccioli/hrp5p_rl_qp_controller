@@ -18,7 +18,7 @@ namespace
   double find_value(std::map<std::string, double> map, std::string joint, std::string map_name, double def = -1)
   {
     auto it = map.find(joint);
-    if (it == map.end())
+    if (it == map.end() && def != -1)
     {
       mc_rtc::log::warning("[PolicyConfig] Missing entry {} in {}", joint, map_name);
       return def;
@@ -129,19 +129,14 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   if (out.policyConfiguration.has("action"))
   {
     out.policyConfiguration("action")("joints", out.actionJointGroup);
-    try
-    {
-      double scale = out.policyConfiguration("scale", 1.0);
-      out.actionScale = std::vector<double>(joint_size, scale);
-    }
-    catch(...)
-    {
-      actionScale_map = out.policyConfiguration("scale", std::map<std::string, double>());
-      out.actionScale = std::vector<double>(actionScale_map.size());
-    }
-    defaultPos_map = out.policyConfiguration("default_position", std::map<std::string, double>());
+    actionScale_map = out.policyConfiguration("action")("scale", std::map<std::string, double>());
+    if (actionScale_map.size() != 0)
+      out.actionScale = std::vector<double>();
+    else
+      out.actionScale = std::vector<double>(joint_size, out.policyConfiguration("action")("scale", 1.0));
+    defaultPos_map = out.policyConfiguration("action")("default_position", std::map<std::string, double>());
     out.defaultPosition = std::vector<double>(defaultPos_map.size());
-    if (!out.defaultPosition.empty() && out.defaultPosition.size() != joint_size)
+    if (!defaultPos_map.empty() && defaultPos_map.size() != joint_size)
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml : default pos should contain all joints if specified");
   }
   else
@@ -151,13 +146,14 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   {
     const std::string & joint = mcRtcJoints[i];
 
-    out.kp[i] = find_value(kp_map, joint, "kp");
-    out.kd[i] = find_value(kd_map, joint, "kd");
+    out.kp[i] = find_value(kp_map, joint, "kp", 0);
+    out.kd[i] = find_value(kd_map, joint, "kd", 0);
+    double scale = find_value(actionScale_map, joint, "action scale", -1);
     
-    if (out.actionScale.size() > 0)
-      out.actionScale.push_back(find_value(actionScale_map, joint, "action scale", 1));
-    if (out.defaultPosition.size() > 0)
-      out.defaultPosition.push_back(find_value(defaultPos_map, joint, "default_position", 0));
+    if (actionScale_map.size() > 0 && scale != -1)
+      out.actionScale.push_back(scale);
+    if (defaultPos_map.size() > 0)
+      out.defaultPosition[i] = find_value(defaultPos_map, joint, "default_position", 0);
   }
 
   out.validate();

@@ -82,6 +82,7 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
       currentObservation_.size(), policy_->getObservationSize());
 
   currentAction_ = policy_->predict(currentObservation_);
+  mc_rtc::log::warning("TEST {}", currentAction_);
 
   if(currentAction_.size() != static_cast<int>(actionToControllerMap_.size()))
     mc_rtc::log::error_and_throw("[RLPolicyRuntime] Action size mismatch. ONNX produced {}, active action mapping expects {} joints.",
@@ -256,7 +257,6 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     }
   }
 
-  mc_rtc::log::warning(actionToControllerMap_);
   for(size_t actionIndex = 0; actionIndex < actionToControllerMap_.size(); ++actionIndex)
   {
     const int dofIndex = actionToControllerMap_[actionIndex];
@@ -269,10 +269,7 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
         policy.name,
         joint);
     }
-
-    actionScale_(dofIndex) = actionScale_(actionIndex);
   }
-  mc_rtc::log::error(q_zero_);
 
   q_rl_ = q_zero_;
 }

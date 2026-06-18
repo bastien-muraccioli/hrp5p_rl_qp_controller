@@ -4,6 +4,7 @@
 #include <RBDyn/MultiBodyConfig.h>
 #include <SpaceVecAlg/SpaceVecAlg>
 #include <mc_rbdyn/rpy_utils.h>
+#include <numeric>
 
 #include <mc_rtc/logging.h>
 
@@ -27,7 +28,7 @@ void JointPosObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<int> controllerIndices = context.policyJointControllerIndices;
+  const std::vector<int> controllerIndices = context.convention.resolveJointControllerIndices(parameters, context.observationRobot.refJointOrder(), context.policyJointControllerIndices);
 
   const int n = static_cast<int>(controllerIndices.size());
   mbcIndices_.resize(static_cast<size_t>(n));
@@ -78,7 +79,7 @@ void JointVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  const std::vector<int> controllerIndices = context.policyJointControllerIndices;
+  const std::vector<int> controllerIndices = context.convention.resolveJointControllerIndices(parameters, context.observationRobot.refJointOrder(), context.policyJointControllerIndices);
 
   const int n = static_cast<int>(controllerIndices.size());
   mbcIndices_.resize(static_cast<size_t>(n));
@@ -241,23 +242,26 @@ void LastActionObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  size_ = readParameter<int>(parameters, "size", static_cast<int>(context.lastActionPolicyOrder.size()));
-
-  if(size_ != context.lastActionPolicyOrder.size())
+  indexes_ = parameters("index", std::vector<int>());
+  if (indexes_.size() != 0)
   {
-    mc_rtc::log::error_and_throw(
-      "[Observation:{}] Configured size ({}) does not match current action size ({})",
-      name(),
-      size_,
-      context.lastActionPolicyOrder.size());
+    std::vector<int> indexes_(static_cast<int>(context.lastActionPolicyOrder.size()));
+    std::iota(indexes_.begin(), indexes_.end(), 0);
   }
-
+  size_ = indexes_.size() != 0 ? indexes_.size() : readParameter<int>(parameters, "size", static_cast<int>(context.lastActionPolicyOrder.size()));
   scale_ = readScale(parameters, "scale", size_, 1.0);
+  mc_rtc::log::warning("indexes {}", indexes_);
+  mc_rtc::log::warning(context.lastActionPolicyOrder[11]);
 }
 
 void LastActionObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  out = scale_.cwiseProduct(context.lastActionPolicyOrder);
+  out = Eigen::VectorXd(size_);
+  for(Eigen::Index i = 0; i < static_cast<Eigen::Index>(indexes_.size()); ++i)
+    out[i] = scale_[i] * context.lastActionPolicyOrder[indexes_[i]];
+  mc_rtc::log::warning("OUT {}", out);
+  mc_rtc::log::warning("lastAction {}", context.lastActionPolicyOrder);
+  // mc_rtc::log::warning("SCALE {}", scale_);
 }
 
 //============================================================================//

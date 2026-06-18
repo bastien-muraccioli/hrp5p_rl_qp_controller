@@ -103,6 +103,7 @@ public:
 
 private:
   int size_ = 0;
+  std::vector<int> indexes_ = {};
   Eigen::VectorXd scale_;
 };
 
