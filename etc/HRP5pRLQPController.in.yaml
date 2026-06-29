@@ -27,17 +27,21 @@ ObserverPipelines:
   log: true
   observers:
     - type: Encoder
-      # velocity: encoderFiniteDifferences
-      velocity: encoderVelocities
-    - type: Attitude
+      velocity: encoderFiniteDifferences
+      # velocity: encoderVelocities
+    - type: Tilt
       required: true
       update: true
-    - type: KinematicInertial
-      update: true
-      config:
-        cutoff: 0.02
-        anchorFrame:
-          maxAnchorFrameDiscontinuity: 0.02
+      filterGains:
+        initAlpha: 4
+        initBeta: 4
+        initGamma: 1
+        finalAlpha: 4
+        finalBeta: 4
+        finalGamma: 1
+      contacts:
+        contactsDetection: Surfaces
+        surfacesForContactDetection: [RightFootCenter, LeftFootCenter]
     # - type: BodySensor
     #   update: true
     #   bodySensor: FloatingBase
