@@ -9,9 +9,8 @@ void HRP5pRLQPController_TorquePos::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.activateQPControl(true);
   ctl.activateTorqueControl(false);
-  ctl.activateFloatingBaseReal(true);
-  ctl.activateContactConstraints(false);
-  ctl.activateExternalTorqueComputation(true);
+  ctl.activateContactConstraints(true);
+  ctl.activateExternalTorqueComputation(false);
   ctl.solver().addTask(ctl.torqueJointTask);
   ctl.torqueJointTask->setPosTarget(ctl.q_zero);
   ctl.setHighPDGains(true); // Use high PD gains
@@ -27,8 +26,7 @@ void HRP5pRLQPController_TorquePos::teardown(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.solver().removeTask(ctl.torqueJointTask);
-  ctl.activateExternalTorqueComputation(false);
-  ctl.activateFloatingBaseReal(false);
+  ctl.activateContactConstraints(false);
 }
 
 EXPORT_SINGLE_STATE("HRP5pRLQPController_TorquePos", HRP5pRLQPController_TorquePos)

@@ -24,7 +24,6 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   void reset(const mc_control::ControllerResetData & reset_data) override;
   void activateQPControl(bool activate);
   void activateTorqueControl(bool activate);
-  void activateFloatingBaseReal(bool activate);
   void activateContactConstraints(bool activate);
   void activateExternalTorqueComputation(bool activate);
   void initializeRLObservation();
@@ -32,7 +31,6 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   // Task
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
   std::shared_ptr<mc_tasks::PostureTask> postureTask;
-  std::shared_ptr<mc_tasks::CompliantPostureTask> compliantPostureTask;
   std::map<std::string, std::vector<double>> defaultPostureTarget; // q0
   
   int nbActuatedJoints = 0;
@@ -67,9 +65,6 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   Eigen::Vector3d currentVelCmd; // Current velocity command
 
   void setHighPDGains(bool high); 
-
-  // ── Schmitt trigger foot-contact detection ─────────────────────────────────
-  void updateFootContactsFromForceSensors();
 
 private:
   mc_rtc::Configuration config_;
@@ -130,40 +125,9 @@ private:
   sva::PTransformd real_qfb_;
   sva::MotionVecd control_vfb_;
   sva::MotionVecd real_vfb_;
-  sva::MotionVecd control_vdotfb_;
-  sva::MotionVecd real_vdotfb_;
 
   std::map<std::string, double> q0_map_; // Used to create the mc_rtc to RL framework joint mapping
 
   bool contactModeChanged_ = true;
   bool contactConstraintsAreEnabled_ = true;
-
-  struct SchmittTrigger
-  {
-    double threshold_on  = 50.0;  // [N] force norm to switch ON
-    double threshold_off = 20.0;  // [N] force norm to switch OFF
-    bool   state         = false;
-
-    bool update(double forceNorm)
-    {
-      if(!state && forceNorm >= threshold_on)  state = true;
-      if( state && forceNorm <  threshold_off) state = false;
-      return state;
-    }
-  };
-
-  SchmittTrigger leftFootSchmitt_;
-  SchmittTrigger rightFootSchmitt_;
-  double leftFootForceNorm_  = 0.0;
-  double rightFootForceNorm_ = 0.0;
-  double footForceEpsilon_   = 100.0; // [N] balance threshold for single/double support
-
-  double tau_pos_ = 2.0;  // [s] position correction time constant
-  double tau_vel_ = 5.0;  // [s] velocity correction time constant
-
-  bool prevLeftContact_  = false;
-  bool prevRightContact_ = false;
-
-  // std::vector<int> refJointToDofIndex_;
-  // bool firstRun_ = true;
 };

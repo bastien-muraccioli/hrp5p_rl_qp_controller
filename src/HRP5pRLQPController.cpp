@@ -29,8 +29,6 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
   torqueJointTask = std::make_shared<mc_tasks::TorqueJointTask>(
       solver(), robot().robotIndex(), 100.0, 1);
   postureTask = getPostureTask(robot().name());
-  compliantPostureTask = std::make_shared<mc_tasks::CompliantPostureTask>(
-      solver(), robot().robotIndex(), 100.0, 1);
 
   initializeRobot();
   initializeRLPolicy();
@@ -45,9 +43,6 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
   Eigen::Vector6d real_vfb = Eigen::Map<const Eigen::Vector6d>(real_robot.mbc().alpha[0].data());
   real_vfb_ = sva::MotionVecd(real_vfb.head<3>(), real_vfb.tail<3>());
   Eigen::Vector6d control_vdotfb = Eigen::Map<const Eigen::Vector6d>(robot.mbc().alphaD[0].data());
-  control_vdotfb_ = sva::MotionVecd(control_vdotfb.head<3>(), control_vdotfb.tail<3>());
-  Eigen::Vector6d real_vdotfb = Eigen::Map<const Eigen::Vector6d>(real_robot.mbc().alphaD[0].data());
-  real_vdotfb_ = sva::MotionVecd(real_vdotfb.head<3>(), real_vdotfb.tail<3>());
 
   addGui();
   addLog();
@@ -65,9 +60,6 @@ bool HRP5pRLQPController::run()
   Eigen::Vector6d real_vfb = Eigen::Map<const Eigen::Vector6d>(real_robot.mbc().alpha[0].data());
   real_vfb_ = sva::MotionVecd(real_vfb.head<3>(), real_vfb.tail<3>());
   Eigen::Vector6d control_vdotfb = Eigen::Map<const Eigen::Vector6d>(robot.mbc().alphaD[0].data());
-  control_vdotfb_ = sva::MotionVecd(control_vdotfb.head<3>(), control_vdotfb.tail<3>());
-  Eigen::Vector6d real_vdotfb = Eigen::Map<const Eigen::Vector6d>(real_robot.mbc().alphaD[0].data());
-  real_vdotfb_ = sva::MotionVecd(real_vdotfb.head<3>(), real_vdotfb.tail<3>());
 
   if(printLimits_) computeLimits();
 
@@ -120,20 +112,6 @@ void HRP5pRLQPController::initializeRobot()
   jointNames = robot().refJointOrder(); // Get the joint names in the order used by the robot state
   nbActuatedJoints = jointNames.size();
 
-  // refJointToDofIndex_.resize(nbActuatedJoints, -1);
-  // for(int i = 0; i < nbActuatedJoints; ++i)
-  // {
-  //   const std::string & jointName = jointNames[i];
-  //   if(robot().hasJoint(jointName))
-  //   {
-  //     auto jIndex = robot().mb().jointIndexByName(jointName);  // ← name-based lookup
-  //     refJointToDofIndex_[i] = robot().mb().joint(jIndex).dof() != 0 
-  //                                   ? robot().mb().jointPosInDof(jIndex)   // ← dofIndex by name
-  //                                   : -1;
-  //   }
-  //   else { refJointToDofIndex_[i] = -1; }
-  // }
-
   q_rl = Eigen::VectorXd::Zero(nbActuatedJoints);
   tau_rl_ = Eigen::VectorXd::Zero(nbActuatedJoints);
   qdot_rl_integrated_ = Eigen::VectorXd::Zero(nbActuatedJoints);
@@ -179,7 +157,6 @@ void HRP5pRLQPController::initializeRobot()
     q_zero[i] = q0_map_.at(joint_name);
     defaultPostureTarget[joint_name] = {q_zero[i]};
     updateIfExists(actionScale[i], actionScale_map, joint_name);
-    // mc_rtc::log::info("[HRP5pRLQPController] [initializeRobot] Joint({}) '{}'\n kp {}\n kd {}\n highKp {}\n highKd {}\n q0 {}\n action scale {}", i, joint_name, kpBase_[i], kdBase_[i], highKpBase_[i], highKdBase_[i], q_zero[i], actionScale[i]);
     i++;
   }
 
@@ -374,10 +351,6 @@ void HRP5pRLQPController::addLog()
   logger().addLogEntry("HRP5pRLQPController_real_qfb", [this]() { return real_qfb_; });
   logger().addLogEntry("HRP5pRLQPController_control_vfb", [this]() { return control_vfb_; });
   logger().addLogEntry("HRP5pRLQPController_real_vfb", [this]() { return real_vfb_; });
-  logger().addLogEntry("HRP5pRLQPController_control_vdotfb", [this]() { return control_vdotfb_; });
-  logger().addLogEntry("HRP5pRLQPController_real_vdotfb", [this]() { return real_vdotfb_; });
-  logger().addLogEntry("HRP5pRLQPController_error_vdotfb", [this]() { return (control_vdotfb_ - real_vdotfb_); });
-  logger().addLogEntry("HRP5pRLQPController_error_vdotfb_norm", [this]() { return (control_vdotfb_.vector() - real_vdotfb_.vector()).norm(); });
 }
 
 void HRP5pRLQPController::addGui()
@@ -402,9 +375,7 @@ void HRP5pRLQPController::addGui()
     mc_rtc::gui::Transform("Control q fb", [this]() { return control_qfb_; }),
     mc_rtc::gui::Transform("Real q fb", [this]() { return real_qfb_; }),
     mc_rtc::gui::ArrayLabel("Control v fb", [this]() { return control_vfb_; }),
-    mc_rtc::gui::ArrayLabel("Real v fb", [this]() { return real_vfb_; }),
-    mc_rtc::gui::ArrayLabel("Control vdot fb", [this]() { return control_vdotfb_; }),
-    mc_rtc::gui::ArrayLabel("Real vdot fb", [this]() { return real_vdotfb_; })
+    mc_rtc::gui::ArrayLabel("Real v fb", [this]() { return real_vfb_; })
   );
 
   // Add PD gains ratio slider
@@ -464,9 +435,7 @@ void HRP5pRLQPController::addGui()
       mc_rtc::gui::Label("Print joint limits", [this]()
         {
           return printLimits_ ? "Enabled" : "Disabled";
-        }),
-      mc_rtc::gui::Input("tau_pos", tau_pos_),
-      mc_rtc::gui::Input("tau_vel", tau_vel_)
+        })
     );
   
   gui()->addElement({"HRP5pRLQPController", "Velocity Command"},
@@ -481,57 +450,6 @@ void HRP5pRLQPController::addGui()
         [&ft_sensor, &robot]() { return robot.bodyPosW(ft_sensor.parent()); })
     );
   }
-
-  // ── Foot contact detection (Schmitt trigger) ────────────────────────────
-  gui()->addElement({"HRP5pRLQPController", "Foot Contact Detection"},
-    // Schmitt trigger thresholds (shared)
-    mc_rtc::gui::NumberInput(
-      "Schmitt Threshold ON [N]",
-      [this]() { return leftFootSchmitt_.threshold_on; },
-      [this](double v) {
-        leftFootSchmitt_.threshold_on  = v;
-        rightFootSchmitt_.threshold_on = v;
-      }),
-    mc_rtc::gui::NumberInput(
-      "Schmitt Threshold OFF [N]",
-      [this]() { return leftFootSchmitt_.threshold_off; },
-      [this](double v) {
-        leftFootSchmitt_.threshold_off  = v;
-        rightFootSchmitt_.threshold_off = v;
-      }),
-
-    // Balance epsilon
-    mc_rtc::gui::NumberInput(
-      "Force Balance Epsilon [N]",
-      [this]() { return footForceEpsilon_; },
-      [this](double v) { footForceEpsilon_ = v; }),
-
-    // Force norm readouts
-    mc_rtc::gui::Label("Left foot force norm [N]",
-      [this]() { return leftFootForceNorm_; }),
-    mc_rtc::gui::Label("Right foot force norm [N]",
-      [this]() { return rightFootForceNorm_; }),
-
-    // Schmitt trigger activity states
-    mc_rtc::gui::Label("Left foot Schmitt state",
-      [this]() -> std::string {
-        return leftFootSchmitt_.state ? "ACTIVE" : "INACTIVE";
-      }),
-    mc_rtc::gui::Label("Right foot Schmitt state",
-      [this]() -> std::string {
-        return rightFootSchmitt_.state ? "ACTIVE" : "INACTIVE";
-      }),
-
-    // Actual contact states
-    mc_rtc::gui::Label("Left foot contact",
-      [this]() -> std::string {
-        return prevLeftContact_ ? "IN CONTACT" : "FREE";
-      }),
-    mc_rtc::gui::Label("Right foot contact",
-      [this]() -> std::string {
-        return prevRightContact_ ? "IN CONTACT" : "FREE";
-      })
-  );
 }
 
 void HRP5pRLQPController::configRL()
@@ -630,21 +548,6 @@ bool HRP5pRLQPController::manageModeSwitching()
       datastore().assign<std::string>("ControlMode", "Position");
     }
 
-    // if(isFloatingBaseReal_)
-    // {
-    //   solver().removeConstraintSet(dynamicsConstraint);
-    //   dynamicsConstraint = mc_rtc::unique_ptr<mc_solver::DynamicsConstraint>(
-    //     new mc_solver::DynamicsConstraint(robots(), 0, {diPercent_, dsPercent_, 0.0, zeta_jointLimit_, lambda_jointLimit_}, velPercent_, true, true));
-    //   solver().addConstraintSet(dynamicsConstraint);
-    // }
-    // else
-    // {
-    //   solver().removeConstraintSet(dynamicsConstraint);
-    //   dynamicsConstraint = mc_rtc::unique_ptr<mc_solver::DynamicsConstraint>(
-    //     new mc_solver::DynamicsConstraint(robots(), 0, {diPercent_, dsPercent_, 0.0, zeta_jointLimit_, lambda_jointLimit_}, velPercent_, false, false));
-    //   solver().addConstraintSet(dynamicsConstraint);
-    // }
-
     controlModeChanged_ = false;
   }  
 
@@ -655,23 +558,8 @@ bool HRP5pRLQPController::manageModeSwitching()
   }
   else 
   {
-    solver().openLoopDriftCorrection(tau_pos_, tau_vel_);
-    return mc_control::fsm::Controller::run(
-      mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
-    // return mc_control::fsm::Controller::run();
-    // return mc_control::fsm::Controller::run(
-    //   mc_solver::FeedbackType::ObservedRobots
-    // );
+    return mc_control::fsm::Controller::run();
   }
-  // if(isFloatingBaseReal_)
-  // {
-  //   return mc_control::fsm::Controller::run(
-  //     mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
-  // }
-  // else 
-  // {
-  //   return mc_control::fsm::Controller::run();
-  // }
 }
 
 void HRP5pRLQPController::activateTorqueControl(bool activate)
@@ -685,21 +573,6 @@ void HRP5pRLQPController::activateTorqueControl(bool activate)
   else if(!activate && isTorqueControl_)
   {
     isTorqueControl_ = false;
-    controlModeChanged_ = true;
-  }
-}
-
-void HRP5pRLQPController::activateFloatingBaseReal(bool activate)
-{
-  if(activate && !isFloatingBaseReal_)
-  {
-    isFloatingBaseReal_ = true;
-    isTorqueControl_ = false;
-    controlModeChanged_ = true;
-  }
-  else if(!activate && isFloatingBaseReal_)
-  {
-    isFloatingBaseReal_ = false;
     controlModeChanged_ = true;
   }
 }
@@ -811,79 +684,5 @@ void HRP5pRLQPController::activateExternalTorqueComputation(bool activate)
 {
   if (activate != datastore().call<bool>("EF_Estimator::isActive")) {
     datastore().call("EF_Estimator::toggleActive");
-  }
-}
-
-void HRP5pRLQPController::updateFootContactsFromForceSensors()
-{
-  auto & real_robot = realRobot(robots()[0].name());
-
-  // ── 1. Measure force norms ──────────────────────────────────────────────
-  leftFootForceNorm_  = real_robot.forceSensor("LeftFootForceSensor")
-                            .worldWrench(real_robot).force().norm();
-  rightFootForceNorm_ = real_robot.forceSensor("RightFootForceSensor")
-                            .worldWrench(real_robot).force().norm();
-
-  // ── 2. Independent Schmitt triggers ────────────────────────────────────
-  const bool leftActive  = leftFootSchmitt_.update(leftFootForceNorm_);
-  const bool rightActive = rightFootSchmitt_.update(rightFootForceNorm_);
-
-  // ── 3. Determine desired contact state ─────────────────────────────────
-  bool wantLeft  = false;
-  bool wantRight = false;
-
-  if(leftActive && rightActive)
-  {
-    const double diff = leftFootForceNorm_ - rightFootForceNorm_;
-    if(std::abs(diff) <= footForceEpsilon_)
-    {
-      // Similar load → double support
-      wantLeft  = true;
-      wantRight = true;
-    }
-    else if(diff > footForceEpsilon_)
-    {
-      // Left significantly heavier → left support only
-      wantLeft  = true;
-      wantRight = false;
-    }
-    else
-    {
-      // Right significantly heavier → right support only
-      wantLeft  = false;
-      wantRight = true;
-    }
-  }
-  else if(leftActive)
-  {
-    wantLeft  = true;
-    wantRight = false;
-  }
-  else if(rightActive)
-  {
-    wantLeft  = false;
-    wantRight = true;
-  }
-  // else: neither active → both false (already default)
-
-  // ── 4. Apply changes only when state flips ──────────────────────────────
-  const Eigen::Vector6d footcontact_dof = Eigen::Vector6d::Ones();
-
-  if(wantLeft != prevLeftContact_)
-  {
-    if(wantLeft)
-      addContact({robot().name(), "ground", "LeftFootCenter", "AllGround", 0.7, footcontact_dof});
-    else
-      removeContact({robot().name(), "ground", "LeftFootCenter", "AllGround"});
-    prevLeftContact_ = wantLeft;
-  }
-
-  if(wantRight != prevRightContact_)
-  {
-    if(wantRight)
-      addContact({robot().name(), "ground", "RightFootCenter", "AllGround", 0.7, footcontact_dof});
-    else
-      removeContact({robot().name(), "ground", "RightFootCenter", "AllGround"});
-    prevRightContact_ = wantRight;
   }
 }
