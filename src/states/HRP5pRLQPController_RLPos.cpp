@@ -20,6 +20,7 @@ void HRP5pRLQPController_RLPos::start(mc_control::fsm::Controller & ctl_)
 bool HRP5pRLQPController_RLPos::run(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
+  // ctl.updateFootContactsFromForceSensors();
   ctl.utilsClass.run_rl_state(ctl);
   ctl.torqueJointTask->setPosTarget(ctl.q_rl);
   return false;
@@ -31,6 +32,7 @@ void HRP5pRLQPController_RLPos::teardown(mc_control::fsm::Controller & ctl_)
   ctl.solver().removeTask(ctl.torqueJointTask);
   ctl.activateExternalTorqueComputation(false);
   ctl.activateFloatingBaseReal(false);
+  ctl.activateContactConstraints(false);
 }
 
 EXPORT_SINGLE_STATE("HRP5pRLQPController_RLPos", HRP5pRLQPController_RLPos)

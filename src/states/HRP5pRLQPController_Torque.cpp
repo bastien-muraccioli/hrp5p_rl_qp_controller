@@ -9,7 +9,7 @@ void HRP5pRLQPController_Torque::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.activateQPControl(true);
   ctl.activateTorqueControl(true);
-  ctl.activateContactConstraints(true);
+  ctl.activateContactConstraints(false);
   ctl.activateExternalTorqueComputation(true);
   ctl.solver().addTask(ctl.torqueJointTask);
   ctl.torqueJointTask->setPosTarget(ctl.q_zero);

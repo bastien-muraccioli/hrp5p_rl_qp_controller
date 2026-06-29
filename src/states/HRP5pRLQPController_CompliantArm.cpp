@@ -9,7 +9,7 @@ void HRP5pRLQPController_CompliantArm::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<HRP5pRLQPController &>(ctl_);
   ctl.activateQPControl(true);
   ctl.activateTorqueControl(false);
-  ctl.activateContactConstraints(false);
+  ctl.activateContactConstraints(true);
   ctl.postureTask->reset();
   ctl.compliantPostureTask->reset();
   ctl.postureTask->selectUnactiveJoints(ctl.solver(), activeJoints_);
