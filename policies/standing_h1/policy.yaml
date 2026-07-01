@@ -1,16 +1,16 @@
-name: walking_h1
+name: standing_h1
 
-onnx: walking_h1.onnx
+onnx: standing_h1.onnx
 
 action:
   joints: all
 
 control:
   use_QP: true
-  use_torque_control: false
+  use_torque_control: true
   command_speed: 0.4
-  kp_scale: 0.9
-  kd_scale: 0.9
+  kp_scale: 1.0
+  kd_scale: 1.0
   period_ms: 20.0
 
   kp:

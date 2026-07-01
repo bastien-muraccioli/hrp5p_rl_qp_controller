@@ -243,11 +243,22 @@ void LastActionObservation::configure(const ObservationContext & context)
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
   indexes_ = parameters("index", std::vector<int>());
-  if (indexes_.size() != 0)
+  const std::vector<int> controllerIndices = context.convention.resolveJointControllerIndices(parameters, context.observationRobot.refJointOrder(), context.policyJointControllerIndices);
+  if (indexes_.size() == 0)
   {
-    std::vector<int> indexes_(static_cast<int>(context.lastActionPolicyOrder.size()));
-    std::iota(indexes_.begin(), indexes_.end(), 0);
+    for (int i = 0; i < controllerIndices.size(); i++)
+    {
+      const int ctrlIdx = controllerIndices[static_cast<size_t>(i)];
+      const std::string & jointName = context.controllerJointOrder[static_cast<size_t>(ctrlIdx)];
+      indexes_[static_cast<size_t>(i)] = context.observationRobot.jointIndexByName(jointName);
+    }
   }
+
+  // if (indexes_.size() != 0)
+  // {
+  //   std::vector<int> indexes_(static_cast<int>(context.lastActionPolicyOrder.size()));
+  //   std::iota(indexes_.begin(), indexes_.end(), 0);
+  // }
   size_ = indexes_.size() != 0 ? indexes_.size() : readParameter<int>(parameters, "size", static_cast<int>(context.lastActionPolicyOrder.size()));
   scale_ = readScale(parameters, "scale", size_, 1.0);
   mc_rtc::log::warning("indexes {}", indexes_);
@@ -259,8 +270,10 @@ void LastActionObservation::compute(const ObservationContext & context, Eigen::R
   out = Eigen::VectorXd(size_);
   for(Eigen::Index i = 0; i < static_cast<Eigen::Index>(indexes_.size()); ++i)
     out[i] = scale_[i] * context.lastActionPolicyOrder[indexes_[i]];
-  mc_rtc::log::warning("OUT {}", out);
-  mc_rtc::log::warning("lastAction {}", context.lastActionPolicyOrder);
+  for (int i = 0 ; i < out.size(); i++)
+    mc_rtc::log::warning("[{}] OUT {}", i, out[i]);
+  for (int i = 0 ; i < context.lastActionPolicyOrder.size(); i++)
+    mc_rtc::log::warning("[{}] lastAction {}", i, context.lastActionPolicyOrder[i]);
   // mc_rtc::log::warning("SCALE {}", scale_);
 }
 
