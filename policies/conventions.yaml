@@ -1,4 +1,14 @@
 conventions:
+  general:
+    observation_defaults:
+      base_orientation:
+        sensor: Accelerometer
+        scale: 1.0
+
+      phase:
+        offset: 0.0
+        scale: 1.0
+
   mjlab:
     joint_groups:
       all: [
@@ -54,14 +64,6 @@ conventions:
         scale: 1.0
 
       projected_gravity:
-        scale: 1.0
-
-      base_orientation:
-        sensor: Accelerometer
-        scale: 1.0
-
-      phase:
-        offset: 0.0
         scale: 1.0
 
       joint_pos_rel:
@@ -140,10 +142,6 @@ conventions:
 
       base_orientation:
         sensor: FloatingBase
-        scale: 1.0
-
-      phase:
-        offset: 0.0
         scale: 1.0
 
       joint_pos:

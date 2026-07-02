@@ -55,27 +55,36 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
 
   mc_rtc::Configuration cfg = conventions(conventionName);
 
-  if(cfg.has("joint_groups"))
+  auto loadJointGroups = [&out](const mc_rtc::Configuration & source)
   {
-    mc_rtc::Configuration groups = cfg("joint_groups");
+    if(!source.has("joint_groups"))
+      return;
+
+    mc_rtc::Configuration groups = source("joint_groups");
     std::vector<std::string> keys = groups.keys();
 
     for(size_t i = 0; i < keys.size(); ++i)
       out.jointGroups[keys[i]] = groups(keys[i], std::vector<std::string>());
-  }
+  };
 
-  if(cfg.has("observation_defaults"))
+  auto loadObservationDefaults = [&out](const mc_rtc::Configuration & source)
   {
-    mc_rtc::Configuration defaults = cfg("observation_defaults");
+    if(!source.has("observation_defaults"))
+      return;
+
+    mc_rtc::Configuration defaults = source("observation_defaults");
     std::vector<std::string> keys = defaults.keys();
 
     for(size_t i = 0; i < keys.size(); ++i)
       out.defaultParameters[keys[i]] = defaults(keys[i]);
-  }
+  };
 
-  if(cfg.has("type_aliases"))
+  auto loadTypeAliases = [&out](const mc_rtc::Configuration & source)
   {
-    mc_rtc::Configuration aliases = cfg("type_aliases");
+    if(!source.has("type_aliases"))
+      return;
+
+    mc_rtc::Configuration aliases = source("type_aliases");
     std::vector<std::string> keys = aliases.keys();
 
     for(size_t i = 0; i < keys.size(); ++i)
@@ -84,7 +93,18 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
       aliases(keys[i], alias);
       out.typeAliases[keys[i]] = alias;
     }
+  };
+
+  if(conventions.has("general") && conventionName != "general")
+  {
+    mc_rtc::Configuration general = conventions("general");
+    loadObservationDefaults(general);
+    loadTypeAliases(general);
   }
+
+  loadJointGroups(cfg);
+  loadObservationDefaults(cfg);
+  loadTypeAliases(cfg);
 
   return out;
 }
