@@ -65,7 +65,7 @@ transitions:
 
 init: NewRLQPController_Initial
 
-policies_root: policies
+policies_root: "@CMAKE_CURRENT_SOURCE_DIR@/policies"
 
 
 default_policy: standing_h1

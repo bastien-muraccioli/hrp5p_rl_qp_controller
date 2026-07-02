@@ -41,6 +41,17 @@ std::string basenameWithoutExtension(const std::string & path)
   return base;
 }
 
+std::string joinPath(const std::string & lhs, const std::string & rhs)
+{
+  if(lhs.empty())
+    return rhs;
+
+  if(lhs.back() == '/')
+    return lhs + rhs;
+
+  return lhs + "/" + rhs;
+}
+
 std::vector<std::string> listPolicies(const std::string & root,
                                                    const std::vector<std::string> & requiredFiles)
 {
@@ -57,7 +68,7 @@ std::vector<std::string> listPolicies(const std::string & root,
     if(name == "." || name == "..")
       continue;
     
-    const std::string folder = root.substr(0, '/') + "/" + name;
+    const std::string folder = joinPath(root, name);
     struct stat status;
     if (stat(folder.c_str(), &status) != 0 || !S_ISDIR(status.st_mode))
       continue;
@@ -65,7 +76,7 @@ std::vector<std::string> listPolicies(const std::string & root,
     bool complete = true;
     for(size_t i = 0; i < requiredFiles.size(); ++i)
     {
-      std::ifstream file((folder.substr(0, '/') + "/" + requiredFiles[i]).c_str());
+      std::ifstream file(joinPath(folder, requiredFiles[i]).c_str());
       if(!file.good())
       {
         complete = false;
@@ -91,8 +102,8 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   PolicyConfig out;
 
   out.folder = policyFolder;
-  out.policyYamlPath = policyFolder.substr(0, '/') + "/" + "policy.yaml";
-  out.observationsYamlPath = policyFolder.substr(0, '/') + "/" + "observations.yaml";
+  out.policyYamlPath = joinPath(policyFolder, "policy.yaml");
+  out.observationsYamlPath = joinPath(policyFolder, "observations.yaml");
 
   out.policyConfiguration.load(out.policyYamlPath);
   out.observationsConfiguration.load(out.observationsYamlPath);
@@ -106,7 +117,7 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
 
   const std::string defaultOnnxName = out.name + ".onnx";
   const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
-  out.onnxPath = policyFolder.substr(0, '/') + "/" + onnxFile;
+  out.onnxPath = joinPath(policyFolder, onnxFile);
   std::map<std::string, double> kp_map, kd_map, defaultPos_map, actionScale_map;
 
   if(out.policyConfiguration.has("control"))
