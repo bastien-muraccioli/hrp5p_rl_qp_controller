@@ -71,7 +71,7 @@ public:
 
   const PolicyConfig & get(const std::string & name) const;
 
-  std::vector<std::string> names() const {return orderedNames_; };
+  const std::vector<std::string> & names() const { return orderedNames_; };
 
   void select(const std::string & name);
   void selectNext();

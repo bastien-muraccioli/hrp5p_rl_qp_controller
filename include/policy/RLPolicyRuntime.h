@@ -51,12 +51,17 @@ public:
   void reloadCurrentPolicy(NewRLQPController & ctl,
                            const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
+  void loadPolicyByName(const std::string & policyName,
+                        NewRLQPController & ctl,
+                        const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
+
   void loadNextPolicy(NewRLQPController & ctl,
                       const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
   bool policyLoaded() const { return policy_ && policy_->isLoaded(); }
 
   const std::string & currentPolicyName() const { return policyManager_.currentName(); }
+  const std::vector<std::string> & availablePolicyNames() const { return policyManager_.names(); }
   const std::string & currentPolicyFolder() const { return policyManager_.current().folder; }
   const std::string & conventionName() const { return observationManager_.conventionName(); }
 

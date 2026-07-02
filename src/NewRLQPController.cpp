@@ -144,11 +144,15 @@ void NewRLQPController::addGui()
     mc_rtc::gui::Label("Current policy", [this]() { return rlRuntime_.currentPolicyName(); }),
     mc_rtc::gui::Label("Current policy folder", [this]() { return rlRuntime_.currentPolicyFolder(); }),
     mc_rtc::gui::Label("Observation convention", [this]() { return rlRuntime_.conventionName(); }),
+    mc_rtc::gui::ComboInput(
+      "Select policy",
+      rlRuntime_.availablePolicyNames(),
+      [this]() { return rlRuntime_.currentPolicyName(); },
+      [this](const std::string & policyName) {
+        rlRuntime_.loadPolicyByName(policyName, *this, torqueJointTask);
+      }),
     mc_rtc::gui::Button("Reload current policy", [this]() {
       rlRuntime_.reloadCurrentPolicy(*this, torqueJointTask);
-    }),
-    mc_rtc::gui::Button("Load next policy", [this]() {
-      rlRuntime_.loadNextPolicy(*this, torqueJointTask);
     }));
 
   gui()->addElement(

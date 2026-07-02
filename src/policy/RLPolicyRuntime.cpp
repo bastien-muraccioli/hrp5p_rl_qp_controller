@@ -113,6 +113,15 @@ void RLPolicyRuntime::reloadCurrentPolicy(NewRLQPController & ctl,
   loadPolicy(policyManager_.currentName(), ctl, torqueTask);
 }
 
+void RLPolicyRuntime::loadPolicyByName(const std::string & policyName,
+                                       NewRLQPController & ctl,
+                                       const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
+{
+  if(policyName == policyManager_.currentName()) { return; }
+
+  loadPolicy(policyName, ctl, torqueTask);
+}
+
 void RLPolicyRuntime::loadNextPolicy(NewRLQPController & ctl,
                                      const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
