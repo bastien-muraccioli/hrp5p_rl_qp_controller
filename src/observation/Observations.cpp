@@ -98,7 +98,7 @@ void JointVelObservation::configure(const ObservationContext & context)
 
 void JointVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  auto vel_map = context.observationRobot.encoderValues();
+  auto vel_map = context.observationRobot.encoderVelocities();
   Eigen::VectorXd currentVel = Eigen::VectorXd::Zero(context.observationRobot.mb().nrDof()-6);
   if (vel_map.size() != 0)
     currentVel = Eigen::VectorXd::Map(vel_map.data(), vel_map.size());
@@ -387,15 +387,16 @@ void PhaseObservation::configure(const ObservationContext & context)
 
   offset_ = readParameter<double>(parameters, "offset", 0.0);
   scale_ = readScale(parameters, "scale", 2, 1.0);
+  cos_first_ = readParameter<bool>(parameters, "cos_first", true);
 }
 
 void PhaseObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
   const double phase = context.phaseNormalized + offset_;
   const double angle = 2.0 * M_PI * phase;
-
-  out(0) = scale_(0) * std::cos(angle);
-  out(1) = scale_(1) * std::sin(angle);
+  
+  out(1-cos_first_) = scale_(0) * std::cos(angle);
+  out(cos_first_) = scale_(1) * std::sin(angle);
 }
 
 

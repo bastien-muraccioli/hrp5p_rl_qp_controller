@@ -29,6 +29,7 @@ observations:
   - type: phase
     parameters:
       history: 1
+      cos_first: true
 
   - type: generated_commands
     parameters:

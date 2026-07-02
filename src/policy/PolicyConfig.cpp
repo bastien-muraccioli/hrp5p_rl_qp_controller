@@ -128,13 +128,18 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     mc_rtc::log::error_and_throw("[PolicyConfig]: policy.yaml should contain a \"control\" entry");
   if (out.policyConfiguration.has("action"))
   {
-    out.policyConfiguration("action")("joints", out.actionJointGroup);
-    actionScale_map = out.policyConfiguration("action")("scale", std::map<std::string, double>());
+    const mc_rtc::Configuration action = out.policyConfiguration("action");
+    action("joints", out.actionJointGroup);
+    out.controlledJointGroup = out.actionJointGroup;
+    if(action.has("controlled_joints"))
+      action("controlled_joints", out.controlledJointGroup);
+
+    actionScale_map = action("scale", std::map<std::string, double>());
     if (actionScale_map.size() != 0)
       out.actionScale = std::vector<double>();
     else
-      out.actionScale = std::vector<double>(joint_size, out.policyConfiguration("action")("scale", 1.0));
-    defaultPos_map = out.policyConfiguration("action")("default_position", std::map<std::string, double>());
+      out.actionScale = std::vector<double>(joint_size, action("scale", 1.0));
+    defaultPos_map = action("default_position", std::map<std::string, double>());
     out.defaultPosition = std::vector<double>(defaultPos_map.size());
     if (!defaultPos_map.empty() && defaultPos_map.size() != joint_size)
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml : default pos should contain all joints if specified");
@@ -155,6 +160,9 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     if (defaultPos_map.size() > 0)
       out.defaultPosition[i] = find_value(defaultPos_map, joint, "default_position", 0);
   }
+
+  if(out.controlledJointGroup.empty())
+    out.controlledJointGroup = out.actionJointGroup;
 
   out.validate();
   return out;

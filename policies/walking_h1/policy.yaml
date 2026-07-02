@@ -3,7 +3,8 @@ name: walking_h1
 onnx: walking_h1.onnx
 
 action:
-  joints: all
+  joints: all # ONNX output layout / size
+  controlled_joints: legs  # joints actually applied to q_rl
 
 control:
   use_QP: true
@@ -12,6 +13,7 @@ control:
   kp_scale: 0.9
   kd_scale: 0.9
   period_ms: 20.0
+  phase_period: 0.8333333333
 
   kp:
     left_hip_yaw_joint: 100.0

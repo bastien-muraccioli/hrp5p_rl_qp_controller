@@ -96,7 +96,12 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
     const int dofIndex = actionToControllerMap_[static_cast<size_t>(actionIndex)];
 
     currentActionScaled_(dofIndex) = actionScale_(dofIndex) * currentAction_(actionIndex);
-    q_rl_(dofIndex) = currentActionScaled_(dofIndex) + q_zero_(dofIndex);
+    if(std::find(controlledActionControllerIndices_.begin(),
+                 controlledActionControllerIndices_.end(),
+                 dofIndex) != controlledActionControllerIndices_.end())
+    {
+      q_rl_(dofIndex) = currentActionScaled_(dofIndex) + q_zero_(dofIndex);
+    }
   }
 
   policyTimer_ = 0.0;
@@ -214,22 +219,47 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
 void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
                                       NewRLQPController & ctl)
 {
-  // Resolve action joints to controller indices (in RL convention order)
-  mc_rtc::Configuration selector;
+  // Resolve action.joints to controller indices.
+  // This is the ONNX action vector layout/size. Do not use controlled_joints here,
+  // otherwise policies that output all joints but only apply legs will get a size mismatch.
+  mc_rtc::Configuration actionSelector;
+  
   if(!policy.actionJointGroup.empty())
-  {
-    mc_rtc::log::error(policy.actionJointGroup);
-    mc_rtc::log::error(activeConvention_.jointGroups);
-    selector.add("joints", policy.actionJointGroup);
-  }
+    actionSelector.add("joints", policy.actionJointGroup);
 
   // Fallback: all controller joints in controller order
   std::vector<int> fullFallback(controllerJointOrder_.size());
   std::iota(fullFallback.begin(), fullFallback.end(), 0);
 
   actionToControllerMap_ = activeConvention_.resolveJointControllerIndices(
-    selector, controllerJointOrder_, fullFallback);
-  mc_rtc::log::warning("indixesa {}", actionToControllerMap_);
+    actionSelector, controllerJointOrder_, fullFallback);
+
+  // Resolve action.controlled_joints to controller indices.
+  // This is the subset of the ONNX outputs that is actually applied to q_rl.
+  mc_rtc::Configuration controlledSelector;
+  controlledSelector.add("joints", policy.controlledJointGroup);
+  controlledActionControllerIndices_ = activeConvention_.resolveJointControllerIndices(
+    controlledSelector, controllerJointOrder_, actionToControllerMap_);
+
+  // controlled_joints must be a subset of action.joints: every controlled joint must
+  // correspond to one output in the ONNX action vector.
+  for(const int controlledIndex : controlledActionControllerIndices_)
+  {
+    if(std::find(actionToControllerMap_.begin(), actionToControllerMap_.end(), controlledIndex)
+       == actionToControllerMap_.end())
+    {
+      mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime:{}] action.controlled_joints contains controller joint index {}, "
+        "but this joint is not present in action.joints",
+        policy.name,
+        controlledIndex);
+    }
+  }
+
+  mc_rtc::log::info("[RLPolicyRuntime:{}] action.joints='{}' -> controller indices {}",
+                    policy.name, policy.actionJointGroup, actionToControllerMap_);
+  mc_rtc::log::info("[RLPolicyRuntime:{}] action.controlled_joints='{}' -> controller indices {}",
+                    policy.name, policy.controlledJointGroup, controlledActionControllerIndices_);
 
   q_zero_.setZero();
   q_rl_.setZero();

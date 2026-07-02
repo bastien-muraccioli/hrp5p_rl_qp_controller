@@ -68,4 +68,4 @@ init: NewRLQPController_Initial
 policies_root: policies
 
 
-default_policy: walking_better_h1
+default_policy: walking_h1

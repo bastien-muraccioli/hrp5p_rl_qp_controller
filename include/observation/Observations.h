@@ -170,6 +170,7 @@ public:
 private:
   double offset_ = 0.0;
   Eigen::VectorXd scale_;
+  bool cos_first_ = true;
 };
 
 } // namespace rlqp

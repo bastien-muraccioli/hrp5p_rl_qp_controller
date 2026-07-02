@@ -131,6 +131,9 @@ private:
   /** @brief Maps active policy action index to controllerJointOrder_ index. policyJointControllerIndices in ObservationContext. */
   std::vector<int> actionToControllerMap_;
 
+  /** @brief Controller-order joint indices that are actually allowed to receive the policy action. */
+  std::vector<int> controlledActionControllerIndices_;
+
   Eigen::VectorXd q_rl_;
   Eigen::VectorXd q_zero_;
   Eigen::VectorXd currentObservation_;

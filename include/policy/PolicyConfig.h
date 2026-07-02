@@ -26,8 +26,16 @@ struct PolicyConfig
   double kpScale = 1.0;
   double kdScale = 1.0;
 
-  /** @brief Optional joint-group selector from policy.yaml/action/joints. */
+  /** @brief Joint-group selector from policy.yaml/action/joints. This describes the ONNX action vector layout/size. */
   std::string actionJointGroup;
+
+  /**
+   * @brief Joint-group selector from policy.yaml/action/controlled_joints.
+   *
+   * This describes which of the ONNX action outputs are actually applied to q_rl.
+   * If omitted, it defaults to actionJointGroup for backward compatibility.
+   */
+  std::string controlledJointGroup;
 
   /** @brief Optional per-joint action scale overrides. Missing entries will use scale 1.0. */
   std::vector<double> actionScale;
