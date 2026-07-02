@@ -250,23 +250,7 @@ void LastActionObservation::configure(const ObservationContext & context)
 void LastActionObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
   out = Eigen::VectorXd::Zero(size_);
-
-  // for(Eigen::Index i = 0; i < std::min(out.size(), context.lastActionPolicyOrder.size()); ++i)
-  // {
-  //   out(i) = context.lastActionPolicyOrder(i) * scale_[static_cast<size_t>(i)];
-  // }
-
-// for(size_t i = 0; i < context.policyJointControllerIndices.size(); ++i)
-// {
-//   const Eigen::Index src = context.policyJointControllerIndices[i];
-
-//   if(src >= 0 && src < context.lastActionPolicyOrder.size())
-//   {
-//     out(static_cast<Eigen::Index>(i)) =
-//       context.lastActionPolicyOrder(src) * scale_[i];
-//   }
-// }
-for(size_t i = 0; i < indexes_.size(); ++i)
+  for(size_t i = 0; i < indexes_.size(); ++i)
   {
     const int observedControllerIndex = indexes_[i];
 

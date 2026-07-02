@@ -103,7 +103,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   out.kd = std::vector<double>(joint_size);
 
   out.name = out.policyConfiguration("name", basenameWithoutExtension(policyFolder));
-  mc_rtc::log::error(out.name);
 
   const std::string defaultOnnxName = out.name + ".onnx";
   const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
