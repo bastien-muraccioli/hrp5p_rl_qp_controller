@@ -100,6 +100,11 @@ public:
   void configure(const ObservationContext & context) override;
   int size() const override { return size_; }
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
+  Eigen::VectorXd makeFullLastActionPolicyOrder(
+    const Eigen::VectorXd & rawAction,
+    const std::vector<int> & actionJointIndicesPolicyOrder,
+    int fullPolicyActionSize,
+    double actionScale);
 
 private:
   int size_ = 0;

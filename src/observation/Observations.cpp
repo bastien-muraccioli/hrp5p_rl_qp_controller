@@ -242,39 +242,53 @@ void LastActionObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
     context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  indexes_ = parameters("index", std::vector<int>());
-  const std::vector<int> controllerIndices = context.convention.resolveJointControllerIndices(parameters, context.observationRobot.refJointOrder(), context.policyJointControllerIndices);
-  if (indexes_.size() == 0)
-  {
-    for (int i = 0; i < controllerIndices.size(); i++)
-    {
-      const int ctrlIdx = controllerIndices[static_cast<size_t>(i)];
-      const std::string & jointName = context.controllerJointOrder[static_cast<size_t>(ctrlIdx)];
-      indexes_[static_cast<size_t>(i)] = context.observationRobot.jointIndexByName(jointName);
-    }
-  }
-
-  // if (indexes_.size() != 0)
-  // {
-  //   std::vector<int> indexes_(static_cast<int>(context.lastActionPolicyOrder.size()));
-  //   std::iota(indexes_.begin(), indexes_.end(), 0);
-  // }
-  size_ = indexes_.size() != 0 ? indexes_.size() : readParameter<int>(parameters, "size", static_cast<int>(context.lastActionPolicyOrder.size()));
+  indexes_ = context.convention.resolveJointControllerIndices(parameters, context.observationRobot.refJointOrder(), context.policyJointControllerIndices);
+  size_ = static_cast<int>(indexes_.size());
   scale_ = readScale(parameters, "scale", size_, 1.0);
-  mc_rtc::log::warning("indexes {}", indexes_);
-  mc_rtc::log::warning(context.lastActionPolicyOrder[11]);
 }
 
 void LastActionObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  out = Eigen::VectorXd(size_);
-  for(Eigen::Index i = 0; i < static_cast<Eigen::Index>(indexes_.size()); ++i)
-    out[i] = scale_[i] * context.lastActionPolicyOrder[indexes_[i]];
-  for (int i = 0 ; i < out.size(); i++)
-    mc_rtc::log::warning("[{}] OUT {}", i, out[i]);
-  for (int i = 0 ; i < context.lastActionPolicyOrder.size(); i++)
-    mc_rtc::log::warning("[{}] lastAction {}", i, context.lastActionPolicyOrder[i]);
-  // mc_rtc::log::warning("SCALE {}", scale_);
+  out = Eigen::VectorXd::Zero(size_);
+
+  // for(Eigen::Index i = 0; i < std::min(out.size(), context.lastActionPolicyOrder.size()); ++i)
+  // {
+  //   out(i) = context.lastActionPolicyOrder(i) * scale_[static_cast<size_t>(i)];
+  // }
+
+// for(size_t i = 0; i < context.policyJointControllerIndices.size(); ++i)
+// {
+//   const Eigen::Index src = context.policyJointControllerIndices[i];
+
+//   if(src >= 0 && src < context.lastActionPolicyOrder.size())
+//   {
+//     out(static_cast<Eigen::Index>(i)) =
+//       context.lastActionPolicyOrder(src) * scale_[i];
+//   }
+// }
+for(size_t i = 0; i < indexes_.size(); ++i)
+  {
+    const int observedControllerIndex = indexes_[i];
+
+    auto it = std::find(
+      context.policyJointControllerIndices.begin(),
+      context.policyJointControllerIndices.end(),
+      observedControllerIndex);
+
+    if(it == context.policyJointControllerIndices.end())
+    {
+      continue;
+    }
+
+    const Eigen::Index src =
+      static_cast<Eigen::Index>(std::distance(context.policyJointControllerIndices.begin(), it));
+
+    if(src >= 0 && src < context.lastActionPolicyOrder.size())
+    {
+      out(static_cast<Eigen::Index>(i)) =
+        context.lastActionPolicyOrder(src) * scale_[i];
+    }
+  }
 }
 
 //============================================================================//
