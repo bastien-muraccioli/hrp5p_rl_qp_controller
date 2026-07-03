@@ -11,6 +11,8 @@
 #include <cmath>
 #include <vector>
 
+#include <mc_tvm/Robot.h>
+
 
 HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config)
 : mc_control::fsm::Controller(rm, dt, config, Backend::TVM)
@@ -23,11 +25,12 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
   solver().removeConstraintSet(dynamicsConstraint);
   dynamicsConstraint = mc_rtc::unique_ptr<mc_solver::DynamicsConstraint>(
     new mc_solver::DynamicsConstraint(robots(), 0, {diPercent_, dsPercent_, 0.0, zeta_jointLimit_, lambda_jointLimit_}, velPercent_, true));
+    dynamicsConstraint->dynamicFunction().useRealStateForDynamics(true);
   solver().addConstraintSet(dynamicsConstraint);
   
   // Initialize Tasks
   torqueJointTask = std::make_shared<mc_tasks::TorqueJointTask>(
-      solver(), robot().robotIndex(), 100.0, 1);
+      solver(), robot().robotIndex(), 100.0, 1000);
   postureTask = getPostureTask(robot().name());
   compliantPostureTask = std::make_shared<mc_tasks::CompliantPostureTask>(
       solver(), robot().robotIndex(), 100.0, 1);
@@ -88,6 +91,8 @@ bool HRP5pRLQPController::run()
     }
     contactModeChanged_ = false;
   }
+
+  robot.tvmRobot().setRealState(real_robot.mbc().q, real_robot.mbc().alpha);
   bool run = manageModeSwitching();
   if(byPassQPControl()) // Run RL without taking the QP into account
   {
@@ -653,25 +658,25 @@ bool HRP5pRLQPController::manageModeSwitching()
     return mc_control::fsm::Controller::run(
           mc_solver::FeedbackType::ClosedLoopIntegrateReal);
   }
-  else 
-  {
-    solver().openLoopDriftCorrection(tau_pos_, tau_vel_);
-    return mc_control::fsm::Controller::run(
-      mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
-    // return mc_control::fsm::Controller::run();
-    // return mc_control::fsm::Controller::run(
-    //   mc_solver::FeedbackType::ObservedRobots
-    // );
-  }
-  // if(isFloatingBaseReal_)
-  // {
-  //   return mc_control::fsm::Controller::run(
-  //     mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
-  // }
   // else 
   // {
-  //   return mc_control::fsm::Controller::run();
+  //   // solver().openLoopDriftCorrection(tau_pos_, tau_vel_);
+  //   return mc_control::fsm::Controller::run(
+  //     mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
+  //   // return mc_control::fsm::Controller::run();
+  //   // return mc_control::fsm::Controller::run(
+  //   //   mc_solver::FeedbackType::ObservedRobots
+  //   // );
   // }
+  if(isFloatingBaseReal_)
+  {
+    return mc_control::fsm::Controller::run(
+      mc_solver::FeedbackType::OpenLoopWithRealFloatingBase);
+  }
+  else 
+  {
+    return mc_control::fsm::Controller::run();
+  }
 }
 
 void HRP5pRLQPController::activateTorqueControl(bool activate)

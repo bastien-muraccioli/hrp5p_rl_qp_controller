@@ -13,6 +13,7 @@ void HRP5pRLQPController_RLPos::start(mc_control::fsm::Controller & ctl_)
   ctl.activateContactConstraints(false);
   ctl.activateExternalTorqueComputation(true);
   ctl.solver().addTask(ctl.torqueJointTask);
+  if(ctl.postureTask->inSolver()) ctl.solver().removeTask(ctl.postureTask);
   ctl.setHighPDGains(false); // Use RL gains
   ctl.utilsClass.start_rl_state(ctl, "RL_State");
 }

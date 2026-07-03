@@ -27,24 +27,29 @@ ObserverPipelines:
   log: true
   observers:
     - type: Encoder
-      # velocity: encoderFiniteDifferences
-      velocity: encoderVelocities
-    # - type: Attitude
-    #   required: true
-    #   update: true
-    # - type: KinematicInertial
-    #   update: true
-    #   config:
-    #     cutoff: 0.02
-    #     anchorFrame:
-    #       maxAnchorFrameDiscontinuity: 0.02
+      velocity: encoderFiniteDifferences
+      # velocity: encoderVelocities
+                          # - type: Tilt
+                          #   required: true
+                          #   update: true
+                          #   filterGains:
+                          #     initAlpha: 4
+                          #     initBeta: 4
+                          #     initGamma: 1
+                          #     finalAlpha: 4
+                          #     finalBeta: 4
+                          #     finalGamma: 1
+                          #   contacts:
+                          #     contactsDetection: Surfaces
+                          #     surfacesForContactDetection: [RightFootCenter, LeftFootCenter]
     - type: BodySensor
       update: true
       bodySensor: FloatingBase
       updateAcc: true
     - type: ExternalForcesObserver
       is_active: false
-      estimation_method: MomentumObserver    # MomentumObserver, ForceSensorBased
+      estimation_method: ForceSensorBased    # MomentumObserver, ForceSensorBased
+      torque_source_type: MotorTorqueMeasurement
       residual_gain: 50.0
 
 constraints:
@@ -72,8 +77,9 @@ transitions:
   - [HRP5pRLQPController_RLWithoutQP, OK, HRP5pRLQPController_Initial, Strict]
 
 # Initial state
-init: HRP5pRLQPController_Initial
+# init: HRP5pRLQPController_Initial
 # init: HRP5pRLQPController_RLWithoutQP
+init: HRP5pRLQPController_RLPos
 
 # RL policy configuration parameters
 policy_path: ["walk.onnx", "stand.onnx", "walk2.onnx", "gazelle2.onnx"]  # Path to the RL policy file(s) 
