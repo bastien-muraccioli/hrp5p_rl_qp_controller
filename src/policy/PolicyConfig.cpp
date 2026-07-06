@@ -41,6 +41,51 @@ std::string basenameWithoutExtension(const std::string & path)
   return base;
 }
 
+std::string joinPath(const std::string & lhs, const std::string & rhs)
+{
+  if(lhs.empty())
+    return rhs;
+
+  if(lhs.back() == '/')
+    return lhs + rhs;
+
+  return lhs + "/" + rhs;
+}
+
+bool fileExists(const std::string & path)
+{
+  std::ifstream file(path.c_str());
+  return file.good();
+}
+
+bool hasOnnxFile(const std::string & folder)
+{
+  DIR * dir = opendir(folder.c_str());
+  if(!dir)
+    return false;
+
+  bool found = false;
+  struct dirent * entry = nullptr;
+  while((entry = readdir(dir)) != nullptr)
+  {
+    const std::string name = entry->d_name;
+    if(name.size() >= 5 && name.substr(name.size() - 5) == ".onnx")
+    {
+      found = true;
+      break;
+    }
+  }
+
+  closedir(dir);
+  return found;
+}
+
+bool isPolicyFolder(const std::string & folder)
+{
+  return fileExists(joinPath(folder, "policy.yaml")) && fileExists(joinPath(folder, "observations.yaml"))
+         && hasOnnxFile(folder);
+}
+
 std::vector<std::string> listPolicies(const std::string & root,
                                                    const std::vector<std::string> & requiredFiles)
 {
@@ -57,7 +102,7 @@ std::vector<std::string> listPolicies(const std::string & root,
     if(name == "." || name == "..")
       continue;
     
-    const std::string folder = root.substr(0, '/') + "/" + name;
+    const std::string folder = joinPath(root, name);
     struct stat status;
     if (stat(folder.c_str(), &status) != 0 || !S_ISDIR(status.st_mode))
       continue;
@@ -65,7 +110,7 @@ std::vector<std::string> listPolicies(const std::string & root,
     bool complete = true;
     for(size_t i = 0; i < requiredFiles.size(); ++i)
     {
-      std::ifstream file((folder.substr(0, '/') + "/" + requiredFiles[i]).c_str());
+      std::ifstream file(joinPath(folder, requiredFiles[i]).c_str());
       if(!file.good())
       {
         complete = false;
@@ -91,8 +136,8 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
   PolicyConfig out;
 
   out.folder = policyFolder;
-  out.policyYamlPath = policyFolder.substr(0, '/') + "/" + "policy.yaml";
-  out.observationsYamlPath = policyFolder.substr(0, '/') + "/" + "observations.yaml";
+  out.policyYamlPath = joinPath(policyFolder, "policy.yaml");
+  out.observationsYamlPath = joinPath(policyFolder, "observations.yaml");
 
   out.policyConfiguration.load(out.policyYamlPath);
   out.observationsConfiguration.load(out.observationsYamlPath);
@@ -106,7 +151,7 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
 
   const std::string defaultOnnxName = out.name + ".onnx";
   const std::string onnxFile = out.policyConfiguration("onnx", defaultOnnxName);
-  out.onnxPath = policyFolder.substr(0, '/') + "/" + onnxFile;
+  out.onnxPath = joinPath(policyFolder, onnxFile);
   std::map<std::string, double> kp_map, kd_map, defaultPos_map, actionScale_map;
 
   if(out.policyConfiguration.has("control"))
@@ -202,7 +247,10 @@ void PolicyManager::load(const mc_rtc::Configuration & controllerConfig, std::ve
   currentName_.clear();
 
   const std::string policiesRoot = controllerConfig("policies_root", std::string("policies"));
-  const std::vector<std::string> folders = listPolicies(policiesRoot, {"policy.yaml", "observations.yaml"});
+  const bool runCurrentFolderPolicy = isPolicyFolder(".");
+  std::vector<std::string> folders = listPolicies(policiesRoot, {"policy.yaml", "observations.yaml"});
+  if(runCurrentFolderPolicy)
+    folders.insert(folders.begin(), ".");
 
   if(folders.empty())
   {
@@ -216,19 +264,25 @@ void PolicyManager::load(const mc_rtc::Configuration & controllerConfig, std::ve
     PolicyConfig policy = PolicyConfig::load(folders[i], mcRtcJoints);
 
     if(policies_.find(policy.name) != policies_.end())
+    {
+      if(runCurrentFolderPolicy)
+        continue;
       mc_rtc::log::error_and_throw("[PolicyManager] Duplicate policy name '{}'", policy.name);
+    }
 
     orderedNames_.push_back(policy.name);
     policies_[policy.name] = policy;
   }
 
   std::string defaultPolicy = orderedNames_.front();
-  controllerConfig("default_policy", defaultPolicy);
+  if(!runCurrentFolderPolicy)
+    controllerConfig("default_policy", defaultPolicy);
   select(defaultPolicy);
 
-  mc_rtc::log::success("[PolicyManager] Loaded {} policies from '{}'. Active policy: {}",
+  mc_rtc::log::success("[PolicyManager] Loaded {} policy{} from '{}'. Active policy: {}",
                        policies_.size(),
-                       policiesRoot,
+                       policies_.size() == 1 ? "" : "s",
+                       runCurrentFolderPolicy ? std::string("current directory") : policiesRoot,
                        currentName_);
 }
 
