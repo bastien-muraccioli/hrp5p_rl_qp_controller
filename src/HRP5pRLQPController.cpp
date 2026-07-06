@@ -49,6 +49,8 @@ bool HRP5pRLQPController::run()
   auto & real_robot = realRobot(robot.name());
   controlFloatingBase_ = robot.mbc().bodyPosW[robot.mb().bodyIndexByName("Body")];
   realFloatingBase_ = real_robot.mbc().bodyPosW[real_robot.mb().bodyIndexByName("Body")];
+  controlFloatingBaseVel_ = robot.mbc().bodyVelW[robot.mb().bodyIndexByName("Body")];
+  realFloatingBaseVel_ = real_robot.mbc().bodyVelW[real_robot.mb().bodyIndexByName("Body")];
 
   if(printLimits_) computeLimits();
 
@@ -373,7 +375,9 @@ void HRP5pRLQPController::addGui()
 
   gui()->addElement({"HRP5pRLQPController", "Visual"},
     mc_rtc::gui::Transform("Control Floating Base", [this]() { return controlFloatingBase_; }),
-    mc_rtc::gui::Transform("Real Floating Base", [this]() { return realFloatingBase_; })
+    mc_rtc::gui::Transform("Real Floating Base", [this]() { return realFloatingBase_; }),
+    mc_rtc::gui::ArrayLabel("Control v fb", [this]() { return controlFloatingBaseVel_; }),
+    mc_rtc::gui::ArrayLabel("Real v fb", [this]() { return realFloatingBaseVel_; })
   );
 
   // Add PD gains ratio slider

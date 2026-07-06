@@ -123,6 +123,8 @@ private:
 
   sva::PTransformd controlFloatingBase_;
   sva::PTransformd realFloatingBase_;
+  sva::MotionVecd controlFloatingBaseVel_;
+  sva::MotionVecd realFloatingBaseVel_;
 
   std::map<std::string, double> q0_map_; // Used to create the mc_rtc to RL framework joint mapping
 
