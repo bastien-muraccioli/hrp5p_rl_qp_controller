@@ -31,7 +31,7 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
       solver(), robot().robotIndex(), 100.0, 1);
 
   initializeRobot();
-  initializeRLPolicy();
+  // initializeRLPolicy();
 
   auto & robot = robots()[0];
   auto & real_robot = realRobot(robot.name());
@@ -69,10 +69,10 @@ bool HRP5pRLQPController::run()
     contactModeChanged_ = false;
   }
   bool run = manageModeSwitching();
-  if(byPassQPControl()) // Run RL without taking the QP into account
-  {
-    return true;
-  }
+  // if(byPassQPControl()) // Run RL without taking the QP into account
+  // {
+  //   return true;
+  // }
   return run; // Return false if QP fails
 }
 
@@ -169,143 +169,143 @@ void HRP5pRLQPController::initializeRobot()
   torqueJointTask->setDamping(kd_);
 }
 
-void HRP5pRLQPController::initializeRLPolicy()
-{
-  // load policy specific configuration
-  policyPaths_ = config_("policy_path", std::vector<std::string>{"walking_better_h1.onnx"});
-  configRL();
+// void HRP5pRLQPController::initializeRLPolicy()
+// {
+//   // load policy specific configuration
+//   policyPaths_ = config_("policy_path", std::vector<std::string>{"walking_better_h1.onnx"});
+//   configRL();
 
-  currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
-  currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
+//   currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
+//   currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
 
-  initializeRLObservation();
+//   initializeRLObservation();
 
-  // Initialize all history slots
-  for (int i = 0; i < HISTORY_SIZE; ++i) {
-      linVel[i] = linVel[0];
-      angVel[i] = angVel[0];
-      projectedGravity[i] = projectedGravity[0];
-      velCmd[i] = velCmd[0];
-      jointPos[i] = jointPos[0];
-      jointVel[i] = jointVel[0];
-      jointAction[i] = jointAction[0];
-      footContactForces[i] = footContactForces[0];
-  }
-}
+//   // Initialize all history slots
+//   for (int i = 0; i < HISTORY_SIZE; ++i) {
+//       linVel[i] = linVel[0];
+//       angVel[i] = angVel[0];
+//       projectedGravity[i] = projectedGravity[0];
+//       velCmd[i] = velCmd[0];
+//       jointPos[i] = jointPos[0];
+//       jointVel[i] = jointVel[0];
+//       jointAction[i] = jointAction[0];
+//       footContactForces[i] = footContactForces[0];
+//   }
+// }
 
-void HRP5pRLQPController::initializeRLObservation()
-{
-  // Observation
-  auto & robot = robots()[0];
-  auto & real_robot = realRobot(robots()[0].name());
+// void HRP5pRLQPController::initializeRLObservation()
+// {
+//   // Observation
+//   auto & robot = robots()[0];
+//   auto & real_robot = realRobot(robots()[0].name());
 
-  // ---------------- Joint positions and velocities ---------------------------------------
+//   // ---------------- Joint positions and velocities ---------------------------------------
 
-  const auto & q_mbc = robot.mbc().q; // MBC order
-  const auto & q_dot_mbc = robot.mbc().alpha; // MBC order
-  Eigen::VectorXd q_rlFrameworkOrdered, q_0_rlFrameworkOrdered, q_dot_rlFrameworkOrdered;
+//   const auto & q_mbc = robot.mbc().q; // MBC order
+//   const auto & q_dot_mbc = robot.mbc().alpha; // MBC order
+//   Eigen::VectorXd q_rlFrameworkOrdered, q_0_rlFrameworkOrdered, q_dot_rlFrameworkOrdered;
 
-  if (currentPolicyIndex < 2) // Use all joints as observation
-  {
-    q_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
-    q_0_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
-    q_dot_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
+//   if (currentPolicyIndex < 2) // Use all joints as observation
+//   {
+//     q_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
+//     q_0_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
+//     q_dot_rlFrameworkOrdered = Eigen::VectorXd::Zero(nbActuatedJoints);
 
-    for(size_t i = 0; i < jointNames.size(); ++i)
-    {
-      const auto & joint_name = jointNames[i];
+//     for(size_t i = 0; i < jointNames.size(); ++i)
+//     {
+//       const auto & joint_name = jointNames[i];
 
-      // Fill mc_rtc ordered vectors
-      const double q = q_mbc[robot.jointIndexByName(joint_name)][0];
-      const double q_dot = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
+//       // Fill mc_rtc ordered vectors
+//       const double q = q_mbc[robot.jointIndexByName(joint_name)][0];
+//       const double q_dot = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
 
-      // RL remapping
-      int rl_index = mcRtcToRLFrameworkJointMap[i];
-      q_rlFrameworkOrdered(rl_index) = q;
-      q_0_rlFrameworkOrdered(rl_index) = q_zero(i);
-      q_dot_rlFrameworkOrdered(rl_index) = q_dot;
-    }
-  }
-  else // Use only the joints that are in the action space as observation 
-  {
-    const int policyObsJointSize = rlPolicy->getActionSize();
-    q_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
-    q_0_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
-    q_dot_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
-    int i = 0;
-    for (const auto &joint_name : refJointOrderRLAction)
-    {
-      q_rlFrameworkOrdered[i] = q_mbc[robot.jointIndexByName(joint_name)][0];
-      q_dot_rlFrameworkOrdered[i] = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
-      q_0_rlFrameworkOrdered[i] = q0_map_.at(joint_name);
-      i++;
-    } 
-  }
+//       // RL remapping
+//       int rl_index = mcRtcToRLFrameworkJointMap[i];
+//       q_rlFrameworkOrdered(rl_index) = q;
+//       q_0_rlFrameworkOrdered(rl_index) = q_zero(i);
+//       q_dot_rlFrameworkOrdered(rl_index) = q_dot;
+//     }
+//   }
+//   else // Use only the joints that are in the action space as observation 
+//   {
+//     const int policyObsJointSize = rlPolicy->getActionSize();
+//     q_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
+//     q_0_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
+//     q_dot_rlFrameworkOrdered = Eigen::VectorXd::Zero(policyObsJointSize);
+//     int i = 0;
+//     for (const auto &joint_name : refJointOrderRLAction)
+//     {
+//       q_rlFrameworkOrdered[i] = q_mbc[robot.jointIndexByName(joint_name)][0];
+//       q_dot_rlFrameworkOrdered[i] = q_dot_mbc[robot.jointIndexByName(joint_name)][0];
+//       q_0_rlFrameworkOrdered[i] = q0_map_.at(joint_name);
+//       i++;
+//     } 
+//   }
 
-  // gravity, fb linear and angular velocity in floating base frame -------------------------------- 
-  const auto & X_0_body = real_robot.mbc().bodyPosW[real_robot.mb().bodyIndexByName("Body")];
-  const auto & bodyVel = real_robot.mbc().bodyVelB[real_robot.mb().bodyIndexByName("Body")];
-  Eigen::Matrix3d R_world_to_body = X_0_body.rotation();
-  Eigen::Vector3d gravity_b = R_world_to_body * Eigen::Vector3d(0.0, 0.0, -1.0);
-  Eigen::Vector3d angVel_b = bodyVel.angular();
-  Eigen::Vector3d linVel_b = bodyVel.linear();
+//   // gravity, fb linear and angular velocity in floating base frame -------------------------------- 
+//   const auto & X_0_body = real_robot.mbc().bodyPosW[real_robot.mb().bodyIndexByName("Body")];
+//   const auto & bodyVel = real_robot.mbc().bodyVelB[real_robot.mb().bodyIndexByName("Body")];
+//   Eigen::Matrix3d R_world_to_body = X_0_body.rotation();
+//   Eigen::Vector3d gravity_b = R_world_to_body * Eigen::Vector3d(0.0, 0.0, -1.0);
+//   Eigen::Vector3d angVel_b = bodyVel.angular();
+//   Eigen::Vector3d linVel_b = bodyVel.linear();
 
-  // Contact forces -------------------------------------------------
-  auto log1p_compress = [](const Eigen::Vector3d& f) -> Eigen::Vector3d {
-    return Eigen::Vector3d(
-        std::copysign(std::log1p(std::abs(f.x())), f.x()),
-        std::copysign(std::log1p(std::abs(f.y())), f.y()),
-        std::copysign(std::log1p(std::abs(f.z())), f.z())
-    );
-  };
-  Eigen::Vector6d footContactForces_vector = Eigen::Vector6d::Zero();
-  const auto & forceSensorRight = real_robot.forceSensor("RightFootForceSensor");
-  const auto & forceSensorLeft = real_robot.forceSensor("LeftFootForceSensor");
-  footContactForces_vector.segment(0, 3) = log1p_compress(forceSensorLeft.worldWrench(real_robot).force());;
-  footContactForces_vector.segment(3, 3) = log1p_compress(forceSensorRight.worldWrench(real_robot).force());;
+//   // Contact forces -------------------------------------------------
+//   auto log1p_compress = [](const Eigen::Vector3d& f) -> Eigen::Vector3d {
+//     return Eigen::Vector3d(
+//         std::copysign(std::log1p(std::abs(f.x())), f.x()),
+//         std::copysign(std::log1p(std::abs(f.y())), f.y()),
+//         std::copysign(std::log1p(std::abs(f.z())), f.z())
+//     );
+//   };
+//   Eigen::Vector6d footContactForces_vector = Eigen::Vector6d::Zero();
+//   const auto & forceSensorRight = real_robot.forceSensor("RightFootForceSensor");
+//   const auto & forceSensorLeft = real_robot.forceSensor("LeftFootForceSensor");
+//   footContactForces_vector.segment(0, 3) = log1p_compress(forceSensorLeft.worldWrench(real_robot).force());;
+//   footContactForces_vector.segment(3, 3) = log1p_compress(forceSensorRight.worldWrench(real_robot).force());;
 
-  projectedGravity[0] = gravity_b;
-  angVel[0] = angVel_b;
-  linVel[0] = linVel_b;
-  velCmd[0] = currentVelCmd;
-  jointPos[0] = q_rlFrameworkOrdered - q_0_rlFrameworkOrdered; // Start with current joint positions
-  jointVel[0] = q_dot_rlFrameworkOrdered;
-  jointAction[0] = currentAction;
-  footContactForces[0] = footContactForces_vector;
-}
+//   projectedGravity[0] = gravity_b;
+//   angVel[0] = angVel_b;
+//   linVel[0] = linVel_b;
+//   velCmd[0] = currentVelCmd;
+//   jointPos[0] = q_rlFrameworkOrdered - q_0_rlFrameworkOrdered; // Start with current joint positions
+//   jointVel[0] = q_dot_rlFrameworkOrdered;
+//   jointAction[0] = currentAction;
+//   footContactForces[0] = footContactForces_vector;
+// }
 
-bool HRP5pRLQPController::byPassQPControl()
-{
-  if(useQP_) return false;
+// bool HRP5pRLQPController::byPassQPControl()
+// {
+//   if(useQP_) return false;
 
-  robot().forwardKinematics();
-  robot().forwardVelocity();
-  robot().forwardAcceleration();
+//   robot().forwardKinematics();
+//   robot().forwardVelocity();
+//   robot().forwardAcceleration();
 
-  const auto & q_mbc     = robot().mbc().q;
-  const auto & q_dot_mbc = robot().mbc().alpha;
+//   const auto & q_mbc     = robot().mbc().q;
+//   const auto & q_dot_mbc = robot().mbc().alpha;
 
-  // --- Position control branch ---
-  if(!isTorqueControl_)
-  {
-    mc_rtc::log::info("[HRP5pRLQPController] byPassQP can't be used in position control mode, returning to QP control");
-    return false;
-  }
+//   // --- Position control branch ---
+//   if(!isTorqueControl_)
+//   {
+//     mc_rtc::log::info("[HRP5pRLQPController] byPassQP can't be used in position control mode, returning to QP control");
+//     return false;
+//   }
 
-  // --- Torque control branch ---
-  for(int i = 0; i < nbActuatedJoints; ++i)
-  {
-    const int mbcIndex = robot().jointIndexInMBC(i);
-    if(mbcIndex < 0) { continue; }
-    if(q_mbc[mbcIndex].empty()) { continue; }
+//   // --- Torque control branch ---
+//   for(int i = 0; i < nbActuatedJoints; ++i)
+//   {
+//     const int mbcIndex = robot().jointIndexInMBC(i);
+//     if(mbcIndex < 0) { continue; }
+//     if(q_mbc[mbcIndex].empty()) { continue; }
 
-    const double q     = q_mbc[mbcIndex][0];
-    const double q_dot = q_dot_mbc[mbcIndex][0];
-    tau_rl_(i) = kp_(i) * (q_rl(i) - q) - kd_(i) * q_dot;
-    robot().mbc().jointTorque[mbcIndex][0] = tau_rl_(i);
-  }
-  return true;
-}
+//     const double q     = q_mbc[mbcIndex][0];
+//     const double q_dot = q_dot_mbc[mbcIndex][0];
+//     tau_rl_(i) = kp_(i) * (q_rl(i) - q) - kd_(i) * q_dot;
+//     robot().mbc().jointTorque[mbcIndex][0] = tau_rl_(i);
+//   }
+//   return true;
+// }
 
 void HRP5pRLQPController::addLog()
 {
@@ -318,36 +318,36 @@ void HRP5pRLQPController::addLog()
   logger().addLogEntry("HRP5pRLQPController_isTorqueControl", [this]() { return isTorqueControl_; });
 
   // RL variables
-  logger().addLogEntry("HRP5pRLQPController_RL_q", [this]() { return q_rl; });
-  logger().addLogEntry("HRP5pRLQPController_RL_tau", [this]() { return tau_rl_; });
-  logger().addLogEntry("HRP5pRLQPController_RL_qZero", [this]() { return q_zero; });
-  logger().addLogEntry("HRP5pRLQPController_RL_currentObservation", [this]() { return currentObservation; });
-  logger().addLogEntry("HRP5pRLQPController_RL_currentAction", [this]() { return currentAction; });
-  logger().addLogEntry("HRP5pRLQPController_RL_currentActionScaled", [this]() { return currentActionScaled; });
-  logger().addLogEntry("HRP5pRLQPController_RL_actionScale", [this]() { return actionScale; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_q", [this]() { return q_rl; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_tau", [this]() { return tau_rl_; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_qZero", [this]() { return q_zero; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_currentObservation", [this]() { return currentObservation; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_currentAction", [this]() { return currentAction; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_currentActionScaled", [this]() { return currentActionScaled; });
+  // logger().addLogEntry("HRP5pRLQPController_RL_actionScale", [this]() { return actionScale; });
   
   // Controller state variables
-  logger().addLogEntry("HRP5pRLQPController_useQP", [this]() { return useQP_; });
+  // logger().addLogEntry("HRP5pRLQPController_useQP", [this]() { return useQP_; });
   logger().addLogEntry("HRP5pRLQPController_isTorqueControl", [this]() { return isTorqueControl_; });
 
   // Log current policy (combined index and path)
-  logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { 
-    return std::to_string(currentPolicyIndex) + ": " + policyPaths_[currentPolicyIndex]; 
-  });
+  // logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { 
+  //   return std::to_string(currentPolicyIndex) + ": " + policyPaths_[currentPolicyIndex]; 
+  // });
 
   logger().addLogEntry("HRP5pRLQPController_externalTorques", [this]() { return externalTorques_; });
 
   // Log observation
-  for (int i = 0; i < HISTORY_SIZE; ++i) {
-    logger().addLogEntry("HRP5pRLQPController_obs_linVel_" + std::to_string(i), [this, i]() { return linVel[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_angVel_" + std::to_string(i), [this, i]() { return angVel[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_projectedGravity_" + std::to_string(i), [this, i]() { return projectedGravity[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_velCmd_" + std::to_string(i), [this, i]() { return velCmd[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_jointPos_" + std::to_string(i), [this, i]() { return jointPos[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_jointVel_" + std::to_string(i), [this, i]() { return jointVel[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_jointAction_" + std::to_string(i), [this, i]() { return jointAction[i]; });
-    logger().addLogEntry("HRP5pRLQPController_obs_footContactForces_" + std::to_string(i), [this, i]() { return footContactForces[i]; });
-  }
+  // for (int i = 0; i < HISTORY_SIZE; ++i) {
+  //   logger().addLogEntry("HRP5pRLQPController_obs_linVel_" + std::to_string(i), [this, i]() { return linVel[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_angVel_" + std::to_string(i), [this, i]() { return angVel[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_projectedGravity_" + std::to_string(i), [this, i]() { return projectedGravity[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_velCmd_" + std::to_string(i), [this, i]() { return velCmd[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_jointPos_" + std::to_string(i), [this, i]() { return jointPos[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_jointVel_" + std::to_string(i), [this, i]() { return jointVel[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_jointAction_" + std::to_string(i), [this, i]() { return jointAction[i]; });
+  //   logger().addLogEntry("HRP5pRLQPController_obs_footContactForces_" + std::to_string(i), [this, i]() { return footContactForces[i]; });
+  // }
 
   logger().addLogEntry("HRP5pRLQPController_controlFloatingBase", [this]() { return controlFloatingBase_; });
   logger().addLogEntry("HRP5pRLQPController_realFloatingBase", [this]() { return realFloatingBase_; });
@@ -355,21 +355,21 @@ void HRP5pRLQPController::addLog()
 
 void HRP5pRLQPController::addGui()
 {
-  gui()->addElement({"HRP5pRLQPController", "Policy"},
-  mc_rtc::gui::Label("Current policy", [this]() -> const std::string & 
-    { 
-      return policyPaths_[currentPolicyIndex]; 
-    }),
-    mc_rtc::gui::Label("Policy Loaded", [this]() { 
-      return rlPolicy->isLoaded() ? "Yes" : "No"; 
-    }),
-    mc_rtc::gui::Label("Observation Size", [this]() { 
-      return std::to_string(rlPolicy->getObservationSize()); 
-    }),
-    mc_rtc::gui::Label("Action Size", [this]() { 
-      return std::to_string(rlPolicy->getActionSize()); 
-    })
-  );
+  // gui()->addElement({"HRP5pRLQPController", "Policy"},
+  // mc_rtc::gui::Label("Current policy", [this]() -> const std::string & 
+  //   { 
+  //     return policyPaths_[currentPolicyIndex]; 
+  //   }),
+  //   mc_rtc::gui::Label("Policy Loaded", [this]() { 
+  //     return rlPolicy->isLoaded() ? "Yes" : "No"; 
+  //   }),
+  //   mc_rtc::gui::Label("Observation Size", [this]() { 
+  //     return std::to_string(rlPolicy->getObservationSize()); 
+  //   }),
+  //   mc_rtc::gui::Label("Action Size", [this]() { 
+  //     return std::to_string(rlPolicy->getActionSize()); 
+  //   })
+  // );
 
   gui()->addElement({"HRP5pRLQPController", "Visual"},
     mc_rtc::gui::Transform("Control Floating Base", [this]() { return controlFloatingBase_; }),
@@ -442,86 +442,86 @@ void HRP5pRLQPController::addGui()
   }
 }
 
-void HRP5pRLQPController::configRL()
-{
-  mc_rtc::log::info("[HRP5pRLQPController] Loading RL policy [{}]: {}", currentPolicyIndex, policyPaths_[currentPolicyIndex]);
-  try {
-    rlPolicy = std::make_unique<RLPolicyInterface>(policyPaths_[currentPolicyIndex]);
-    if(rlPolicy) {
-      mc_rtc::log::success("[HRP5pRLQPController] RL policy loaded successfully");
-      // Initialize observation vector with the correct size from the loaded policy
-      currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
-      mc_rtc::log::info("[HRP5pRLQPController] Initialized observation vector with size: {}", rlPolicy->getObservationSize());
-      currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
-      mc_rtc::log::info("[HRP5pRLQPController] Initialized action vector with size: {}", rlPolicy->getActionSize());
-    } else {
-      mc_rtc::log::error_and_throw("[HRP5pRLQPController] RL policy creation failed - policy is null");
-    }
-  } catch(const std::exception& e) {
-    mc_rtc::log::error_and_throw("[HRP5pRLQPController] Failed to load RL policy: {}", e.what());
-  }
+// void HRP5pRLQPController::configRL()
+// {
+//   mc_rtc::log::info("[HRP5pRLQPController] Loading RL policy [{}]: {}", currentPolicyIndex, policyPaths_[currentPolicyIndex]);
+//   try {
+//     rlPolicy = std::make_unique<RLPolicyInterface>(policyPaths_[currentPolicyIndex]);
+//     if(rlPolicy) {
+//       mc_rtc::log::success("[HRP5pRLQPController] RL policy loaded successfully");
+//       // Initialize observation vector with the correct size from the loaded policy
+//       currentObservation = Eigen::VectorXd::Zero(rlPolicy->getObservationSize());
+//       mc_rtc::log::info("[HRP5pRLQPController] Initialized observation vector with size: {}", rlPolicy->getObservationSize());
+//       currentAction = Eigen::VectorXd::Zero(rlPolicy->getActionSize());
+//       mc_rtc::log::info("[HRP5pRLQPController] Initialized action vector with size: {}", rlPolicy->getActionSize());
+//     } else {
+//       mc_rtc::log::error_and_throw("[HRP5pRLQPController] RL policy creation failed - policy is null");
+//     }
+//   } catch(const std::exception& e) {
+//     mc_rtc::log::error_and_throw("[HRP5pRLQPController] Failed to load RL policy: {}", e.what());
+//   }
 
-  policyStepSize = config_("policies")[currentPolicyIndex]("policy_step_size", 1.0);
-  const double physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 1.0);
-  if(physicsStepSize - timeStep > 1e-8) {
-    mc_rtc::log::warning("[HRP5pRLQPController] Physics step size ({:.3f} s) is larger than controller time step ({:.3f} s). This may cause issues with the policy. Consider fixing the controller time step.", physicsStepSize, timeStep);
-  }
+//   policyStepSize = config_("policies")[currentPolicyIndex]("policy_step_size", 1.0);
+//   const double physicsStepSize = config_("policies")[currentPolicyIndex]("physics_step_size", 1.0);
+//   if(physicsStepSize - timeStep > 1e-8) {
+//     mc_rtc::log::warning("[HRP5pRLQPController] Physics step size ({:.3f} s) is larger than controller time step ({:.3f} s). This may cause issues with the policy. Consider fixing the controller time step.", physicsStepSize, timeStep);
+//   }
 
-  refJointOrderRLAction = config_("policies")[currentPolicyIndex]("ref_joint_order", std::vector<std::string>{});
-  if(refJointOrderRLAction.size() != size_t(rlPolicy->getActionSize())) {
-    mc_rtc::log::error_and_throw("[HRP5pRLQPController] Reference joint order size ({}) does not match policy action size ({}). Please check the configuration.", refJointOrderRLAction.size(), rlPolicy->getActionSize());
-  }
+//   refJointOrderRLAction = config_("policies")[currentPolicyIndex]("ref_joint_order", std::vector<std::string>{});
+//   if(refJointOrderRLAction.size() != size_t(rlPolicy->getActionSize())) {
+//     mc_rtc::log::error_and_throw("[HRP5pRLQPController] Reference joint order size ({}) does not match policy action size ({}). Please check the configuration.", refJointOrderRLAction.size(), rlPolicy->getActionSize());
+//   }
 
-  // Create mapping from action indices to robot joint indices based on the reference joint order
-  actionToDofMap.resize(refJointOrderRLAction.size(), -1); // Initialize with -1 to indicate unmapped actions
-  for (size_t j = 0; j < refJointOrderRLAction.size(); ++j) {
-    for (int i = 0; i < nbActuatedJoints; ++i) {
-      if (jointNames[i] == refJointOrderRLAction[j]) {
-        actionToDofMap[j] = i;
-        // mc_rtc::log::info("[HRP5pRLQPController] Mapping action index {} to joint[{}] '{}'", j, i, jointNames[i]);
-        break;
-      }
-    }
-  }
+//   // Create mapping from action indices to robot joint indices based on the reference joint order
+//   actionToDofMap.resize(refJointOrderRLAction.size(), -1); // Initialize with -1 to indicate unmapped actions
+//   for (size_t j = 0; j < refJointOrderRLAction.size(); ++j) {
+//     for (int i = 0; i < nbActuatedJoints; ++i) {
+//       if (jointNames[i] == refJointOrderRLAction[j]) {
+//         actionToDofMap[j] = i;
+//         // mc_rtc::log::info("[HRP5pRLQPController] Mapping action index {} to joint[{}] '{}'", j, i, jointNames[i]);
+//         break;
+//       }
+//     }
+//   }
 
-  // Create mapping between RL framework joint order and mc_rtc joint indices, this is useful for correctly ordering the observation and action vectors according to the robot's joint order in mc_rtc.
-  auto q0_map_cfg = config_("policies")[currentPolicyIndex]("q0");
-  std::vector<std::string> keys = q0_map_cfg.keys(); // this preserves order
+//   // Create mapping between RL framework joint order and mc_rtc joint indices, this is useful for correctly ordering the observation and action vectors according to the robot's joint order in mc_rtc.
+//   auto q0_map_cfg = config_("policies")[currentPolicyIndex]("q0");
+//   std::vector<std::string> keys = q0_map_cfg.keys(); // this preserves order
 
-  if (keys.size() != static_cast<size_t>(nbActuatedJoints)) {
-    mc_rtc::log::error_and_throw("[HRP5pRLQPController] The number of joints in q0 config ({}) does not match the robot's dof number ({}). Please check the configuration.", keys.size(), nbActuatedJoints);
-  }
+//   if (keys.size() != static_cast<size_t>(nbActuatedJoints)) {
+//     mc_rtc::log::error_and_throw("[HRP5pRLQPController] The number of joints in q0 config ({}) does not match the robot's dof number ({}). Please check the configuration.", keys.size(), nbActuatedJoints);
+//   }
 
-  // Compare if q0 order matches mc_rtc joint order, just to log it since the mapping will be created anyway.
-  bool orderMatches = true;
-  for (size_t i = 0; i < keys.size(); ++i) {
-      if (keys[i] != jointNames[i]) {
-          orderMatches = false;
-          break;
-      }
-  }
-  if(orderMatches) mc_rtc::log::info("[HRP5pRLQPController] The order of joints in q0 config matches the robot's joint order in mc_rtc.");
+//   // Compare if q0 order matches mc_rtc joint order, just to log it since the mapping will be created anyway.
+//   bool orderMatches = true;
+//   for (size_t i = 0; i < keys.size(); ++i) {
+//       if (keys[i] != jointNames[i]) {
+//           orderMatches = false;
+//           break;
+//       }
+//   }
+//   if(orderMatches) mc_rtc::log::info("[HRP5pRLQPController] The order of joints in q0 config matches the robot's joint order in mc_rtc.");
 
-  // rlFrameworkToMcRtcJointMap.resize(dofNumber, -1); // Initialize with -1 to indicate unmapped joints
-  mcRtcToRLFrameworkJointMap.resize(nbActuatedJoints, -1);
-  int j = 0;
-  for (const auto & key : keys) { 
-    for (int i = 0; i < nbActuatedJoints; ++i) {
-      if (jointNames[i] == key) {
-        // rlFrameworkToMcRtcJointMap[j] = i;
-        mcRtcToRLFrameworkJointMap[i] = j;
-        break;
-      }
-    }
-    j++;
-  }
+//   // rlFrameworkToMcRtcJointMap.resize(dofNumber, -1); // Initialize with -1 to indicate unmapped joints
+//   mcRtcToRLFrameworkJointMap.resize(nbActuatedJoints, -1);
+//   int j = 0;
+//   for (const auto & key : keys) { 
+//     for (int i = 0; i < nbActuatedJoints; ++i) {
+//       if (jointNames[i] == key) {
+//         // rlFrameworkToMcRtcJointMap[j] = i;
+//         mcRtcToRLFrameworkJointMap[i] = j;
+//         break;
+//       }
+//     }
+//     j++;
+//   }
 
-  for (int i = 0; i < nbActuatedJoints; ++i) {
-    if (mcRtcToRLFrameworkJointMap[i] == -1) {
-      mc_rtc::log::error_and_throw("[HRP5pRLQPController] Joint '{}' was not properly mapped!", jointNames[i]);
-    }
-  }
-}
+//   for (int i = 0; i < nbActuatedJoints; ++i) {
+//     if (mcRtcToRLFrameworkJointMap[i] == -1) {
+//       mc_rtc::log::error_and_throw("[HRP5pRLQPController] Joint '{}' was not properly mapped!", jointNames[i]);
+//     }
+//   }
+// }
 
 bool HRP5pRLQPController::manageModeSwitching()
 {

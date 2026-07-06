@@ -12,14 +12,14 @@ find_library(ONNXRUNTIME_LIB
 
 set(controller_SRC 
   HRP5pRLQPController.cpp
-  RLPolicyInterface.cpp
-  utils.cpp
+  # RLPolicyInterface.cpp
+  # utils.cpp
 )
 
 set(controller_HDR 
   HRP5pRLQPController.h
-  RLPolicyInterface.h
-  utils.h
+  # RLPolicyInterface.h
+  # utils.h
 )
 
 add_library(${PROJECT_NAME} SHARED ${controller_SRC} ${controller_HDR})

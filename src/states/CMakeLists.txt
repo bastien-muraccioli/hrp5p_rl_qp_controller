@@ -1,4 +1,4 @@
 add_fsm_state_simple(HRP5pRLQPController_Initial)
-add_fsm_state_simple(HRP5pRLQPController_RL)
-add_fsm_state_simple(HRP5pRLQPController_RLWithoutQP)
+# add_fsm_state_simple(HRP5pRLQPController_RL)
+# add_fsm_state_simple(HRP5pRLQPController_RLWithoutQP)
 add_fsm_data_directory(data)

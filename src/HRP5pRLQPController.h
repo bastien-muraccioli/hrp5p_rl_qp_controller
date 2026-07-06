@@ -8,8 +8,8 @@
 
 #include "api.h"
 
-#include "RLPolicyInterface.h"
-#include "utils.h"
+// #include "RLPolicyInterface.h"
+// #include "utils.h"
 #include <Eigen/src/Core/Matrix.h>
 #include <array>
 #include <string>
@@ -53,8 +53,8 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   std::vector<int> mcRtcToRLFrameworkJointMap; // size = nbActuatedJoints
 
   size_t currentPolicyIndex = 0;
-  std::unique_ptr<RLPolicyInterface> rlPolicy;
-  utils utilsClass; // Utility functions for RL controller
+  // std::unique_ptr<RLPolicyInterface> rlPolicy;
+  // utils utilsClass; // Utility functions for RL controller
 
   // observation
   static constexpr int HISTORY_SIZE = 5; // Number of past time steps to include in the observation
@@ -75,13 +75,13 @@ private:
   void addGui();
 
   void initializeRobot();
-  void configRL();
-  void initializeRLPolicy();
+  // void configRL();
+  // void initializeRLPolicy();
 
   // Handle switching between Torque and Position control modes. Torque control is better for directly applying the RL torques, while position control is simulating the torque reference in high gains position control which is experimental. Except in simulation avoid switching between control modes during the execution on the real robot to prevent potential issues with the hardware.
   bool manageModeSwitching();
   // Directly use RL output without QP modifications (Torque Control only) 
-  bool byPassQPControl(); 
+  // bool byPassQPControl(); 
   void computeLimits();
   bool printLimits_ = true;
 
