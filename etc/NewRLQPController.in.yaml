@@ -34,6 +34,9 @@ ObserverPipelines:
     - type: Encoder
       config:
           velocity: encoderVelocities
+    - type: BodySensor
+      update: true
+      bodySensor: FloatingBase
     - type: Tilt
       required: true
       update: true
@@ -47,15 +50,10 @@ ObserverPipelines:
           finalBeta: 2
           finalGamma: 1
     - type: ExternalForcesObserver
-      required: true
-      config:
-        residual_gain: 100
-        reference_frame: pelvis
-        verbose: false
-        ft_sensor_name: none
-        use_force_sensor: false
-        torque_source_type: CommandedTorque
-        residual_speed_gain: 100
+      estimation_method: MomentumObserver
+      use_forces_from_ft_sensors: false
+      residual_gain: 100
+      torque_source_type: CommandedTorque
 
 
 states: {}

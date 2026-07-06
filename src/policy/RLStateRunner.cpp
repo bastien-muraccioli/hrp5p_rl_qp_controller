@@ -45,8 +45,3 @@ void RLStateRunner::run(mc_control::fsm::Controller & ctl_)
     mc_rtc::log::error("[RLStateRunner] Error during RL state run: {}", e.what());
   }
 }
-
-void RLStateRunner::teardown(mc_control::fsm::Controller & ctl)
-{
-  ctl.gui()->removeCategory({"NewRLQPController", stateName_});
-}

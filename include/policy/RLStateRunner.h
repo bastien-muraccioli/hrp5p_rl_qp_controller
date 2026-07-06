@@ -49,13 +49,6 @@ struct RLStateRunner
     */
   void run(mc_control::fsm::Controller & ctl_);
 
-  /**
-   * @brief Called when an RL FSM state ends.
-   *
-   * Removes the policy GUI panel added by start_rl_state().
-    */
-  void teardown(mc_control::fsm::Controller & ctl_);
-
   private:
    std::string stateName_;
 };
