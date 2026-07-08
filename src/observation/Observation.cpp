@@ -28,7 +28,7 @@ mc_rtc::Configuration loadConventionRoot(const mc_rtc::Configuration & controlle
     return controllerConfig;
   std::string policiesRoot = "policies/";
   controllerConfig("policies_root", policiesRoot);
-  const std::string conventionsPath = policiesRoot.substr(0, '/') + "/" + "conventions.yaml";
+  const std::string conventionsPath = policiesRoot + "/conventions.yaml";
 
   mc_rtc::Configuration conventionsConfig;
   conventionsConfig.load(conventionsPath);
