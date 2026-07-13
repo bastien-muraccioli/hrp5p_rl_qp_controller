@@ -1,0 +1,201 @@
+---
+Managed: false
+StepByStep: true
+IdleKeepState: false
+
+StatesLibraries:
+  - "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@"
+  - "@MC_STATES_RUNTIME_INSTALL_PREFIX@"
+
+StatesFiles:
+  - "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@/data"
+  - "@MC_STATES_RUNTIME_INSTALL_PREFIX@/data"
+
+VerboseStateFactory: false
+
+robots:
+  ground:
+    module: env/ground
+
+robot:
+  base_body: pelvis
+  observation_source: realRobot
+
+collisions:
+  - type: collision
+    useMinimal: true
+
+ObserverPipelines:
+  name: MainPipeline
+  gui: true
+  log: true
+
+  observers:
+    - type: Encoder
+      config:
+          velocity: encoderVelocities
+    - type: BodySensor
+      update: true
+      bodySensor: FloatingBase
+    - type: Tilt
+      required: true
+      update: true
+      config:
+        anchorFrameFunction: anchorFrameFunction
+        filterGains:
+          initAlpha: 2
+          initBeta: 2
+          initGamma: 1
+          finalAlpha: 2
+          finalBeta: 2
+          finalGamma: 1
+    - type: ExternalForcesObserver
+      estimation_method: MomentumObserver
+      use_forces_from_ft_sensors: false
+      residual_gain: 100
+      torque_source_type: CommandedTorque
+
+
+states: {}
+
+transitions:
+  - [HRP5pRLQPController_Initial, OK, HRP5pRLQPController_Initial, Strict]
+
+init: HRP5pRLQPController_Initial
+
+policies_root: "@CMAKE_CURRENT_SOURCE_DIR@/policies"
+
+
+default_policy: gazelle2
+
+high_kp:
+  RCY: 5400
+  RCR: 12925
+  RCP: 16000
+  RKP: 36000
+  RAP: 8000
+  RAR: 2244
+
+  LCY: 5400
+  LCR: 12925
+  LCP: 16000
+  LKP: 36000
+  LAP: 8000
+  LAR: 2244
+
+  WP: 8000
+  WR: 8000
+  WY: 8000
+
+  HY: 1311
+  HP: 1311
+
+  RSC: 3235
+  RSP: 3235
+  RSR: 5586
+  RSY: 1429
+  REP: 8705
+  RWRY: 1386
+  RWRR: 1386
+  RWRP: 1492
+  RHDY: 693
+
+  RTMP: 693
+  RTPIP: 693
+  RTDIP: 693
+
+  RIMP: 693
+  RIPIP: 693
+  RIDIP: 693
+
+  RMMP: 693
+  RMPIP: 693
+  RMDIP: 693
+
+  LSC: 3235
+  LSP: 3235
+  LSR: 5586
+  LSY: 1429
+  LEP: 8705
+  LWRY: 1386
+  LWRR: 1386
+  LWRP: 1492
+  LHDY: 693
+
+  LTMP: 693
+  LTPIP: 693
+  LTDIP: 693
+
+  LIMP: 693
+  LIPIP: 693
+  LIDIP: 693
+
+  LMMP: 693
+  LMPIP: 693
+  LMDIP: 693
+
+high_kd:
+  RCY: 54
+  RCR: 103.40
+  RCP: 160.00
+  RKP: 360.00
+  RAP: 80.00
+  RAR: 22.44
+
+  LCY: 54
+  LCR: 103.40
+  LCP: 160.00
+  LKP: 360.00
+  LAP: 80.00
+  LAR: 22.44
+
+  WP: 80.00
+  WR: 80.00
+  WY: 80.00
+
+  HY: 13.11
+  HP: 13.11
+
+  RSC: 32.35
+  RSP: 32.35
+  RSR: 55.86
+  RSY: 10.83
+  REP: 87.05
+  RWRY: 13.87
+  RWRR: 13.87
+  RWRP: 11.19
+  RHDY: 6.93
+
+  RTMP: 6.93
+  RTPIP: 6.93
+  RTDIP: 6.93
+
+  RIMP: 6.93
+  RIPIP: 6.93
+  RIDIP: 6.93
+
+  RMMP: 6.93
+  RMPIP: 6.93
+  RMDIP: 6.93
+
+  LSC: 32.35
+  LSP: 32.35
+  LSR: 55.86
+  LSY: 10.83
+  LEP: 87.05
+  LWRY: 13.87
+  LWRR: 13.87
+  LWRP: 11.19
+  LHDY: 6.93
+
+  LTMP: 6.93
+  LTPIP: 6.93
+  LTDIP: 6.93
+
+  LIMP: 6.93
+  LIPIP: 6.93
+  LIDIP: 6.93
+
+  LMMP: 6.93
+  LMPIP: 6.93
+  LMDIP: 6.93

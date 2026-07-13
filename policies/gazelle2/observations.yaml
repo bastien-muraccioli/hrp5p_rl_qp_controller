@@ -1,33 +1,36 @@
 training_convention: mjlab
 
+history_order_newest_first: false
+
 observations:
   - type: base_lin_vel
     parameters:
-      history: 3
+      history: 5
 
   - type: base_ang_vel
     parameters:
-      history: 3
+      history: 5
 
   - type: projected_gravity
     parameters:
-      history: 3
+      history: 5
+      body: Body
 
   - type: joint_pos_rel
     parameters:
-      history: 3
-      joints: all
+      history: 5
+      joints: all_no_grippers
 
   - type: joint_vel_rel
     parameters:
-      history: 3
-      joints: all
+      history: 5
+      joints: all_no_grippers
 
   - type: last_action
     parameters:
       joints: all_no_grippers
-      history: 3
+      history: 5
 
   - type: generated_commands
     parameters:
-      history: 3
+      history: 5

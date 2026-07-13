@@ -1,6 +1,6 @@
 #pragma once
-#include <Eigen/Core>
 #include <mc_control/fsm/State.h>
+#include <Eigen/Core>
 #include <string>
 
 /**
@@ -8,7 +8,7 @@
  *
  * utils provides three FSM hooks (start / run / teardown) and the observation
  * assembly function getCurrentObservation(). One utils instance lives inside
- * NewRLQPController and is called from each FSM RL state.
+ * HRP5pRLQPController and is called from each FSM RL state.
  *
  * ## Usage in an FSM state
  *
@@ -16,7 +16,7 @@
  * // In MyState.cpp
  * bool MyState::run(mc_control::fsm::Controller & ctl)
  * {
- *   auto & c = static_cast<NewRLQPController&>(ctl);
+ *   auto & c = static_cast<HRP5pRLQPController&>(ctl);
  *   c.rlStateRunner.run(ctl);
  *   // ... handle transitions ...
  * }
@@ -24,7 +24,7 @@
  *
  */
 struct RLStateRunner
-{  
+{
   /**
    * @brief Called when an RL FSM state starts.
    *
@@ -46,9 +46,9 @@ struct RLStateRunner
    * Between inference steps, q_rl is held constant. The PD torque is recomputed
    * at every controller timestep using fresh joint state (equivalent to a real
    * onboard PD loop running faster than the policy).
-    */
+   */
   void run(mc_control::fsm::Controller & ctl_);
 
-  private:
-   std::string stateName_;
+private:
+  std::string stateName_;
 };

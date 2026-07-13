@@ -2,7 +2,7 @@
 
 #include <mc_control/fsm/State.h>
 
-struct HRP5pRLQPController_Initial : mc_control::fsm::State
+struct HRP5pRLQPController_CompliantArm : mc_control::fsm::State
 {
 
   void configure(const mc_rtc::Configuration & config) override;
@@ -14,4 +14,5 @@ struct HRP5pRLQPController_Initial : mc_control::fsm::State
   void teardown(mc_control::fsm::Controller & ctl) override;
 
 private:
+  std::vector<std::string> activeJoints_ = {"RSC", "RSP", "RSR", "RSY", "REP", "RWRY", "RWRR", "RWRP"};
 };

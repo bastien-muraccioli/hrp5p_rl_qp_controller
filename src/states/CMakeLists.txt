@@ -1,3 +1,9 @@
-add_fsm_state_simple(NewRLQPController_Initial)
-
+add_fsm_state_simple(HRP5pRLQPController_Initial)
+add_fsm_state_simple(HRP5pRLQPController_RL)
+# add_fsm_state_simple(HRP5pRLQPController_Torque)
+# add_fsm_state_simple(HRP5pRLQPController_RLPos)
+# add_fsm_state_simple(HRP5pRLQPController_TorquePos)
+# add_fsm_state_simple(HRP5pRLQPController_RLWithoutQP)
+# add_fsm_state_simple(HRP5pRLQPController_RLPosWithoutQP)
+# add_fsm_state_simple(HRP5pRLQPController_CompliantArm)
 add_fsm_data_directory(data)

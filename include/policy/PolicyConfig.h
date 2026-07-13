@@ -22,6 +22,7 @@ struct PolicyConfig
   std::string observationsYamlPath;
 
   bool useQP = true;
+  bool isTorqueControl = true;
   double policyStepSize = 0.02;
   double kpScale = 1.0;
   double kdScale = 1.0;
@@ -61,17 +62,32 @@ class PolicyManager
 public:
   void load(const mc_rtc::Configuration & controllerConfig, std::vector<std::string> mcRtcJoints);
 
-  bool empty() const { return policies_.empty(); };
+  bool empty() const
+  {
+    return policies_.empty();
+  };
 
-  size_t size() const { return policies_.size(); };
+  size_t size() const
+  {
+    return policies_.size();
+  };
 
-  const PolicyConfig & current() const { return get(currentName_); };
+  const PolicyConfig & current() const
+  {
+    return get(currentName_);
+  };
 
-  const std::string & currentName() const { return currentName_; };
+  const std::string & currentName() const
+  {
+    return currentName_;
+  };
 
   const PolicyConfig & get(const std::string & name) const;
 
-  const std::vector<std::string> & names() const { return orderedNames_; };
+  const std::vector<std::string> & names() const
+  {
+    return orderedNames_;
+  };
 
   void select(const std::string & name);
   void selectNext();

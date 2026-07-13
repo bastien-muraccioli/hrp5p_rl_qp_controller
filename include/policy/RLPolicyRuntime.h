@@ -7,20 +7,20 @@
 
 #include <Eigen/Core>
 
-#include <mc_rtc/Configuration.h>
 #include <mc_rbdyn/Robot.h>
+#include <mc_rtc/Configuration.h>
 #include <mc_tasks/TorqueJointTask.h>
 
 #include <memory>
 #include <string>
 #include <vector>
 
-struct NewRLQPController;
+struct HRP5pRLQPController;
 
 namespace rlqp
 {
 
-  /**
+/**
  * @brief Runtime owner of the active RL policy session.
  *
  * Responsibilities:
@@ -33,7 +33,7 @@ namespace rlqp
  * - Convert policy outputs into q_rl targets.
  * - Manage policy gains and action scaling.
  *
- * NewRLQPController remains responsible for the mc_rtc lifecycle.
+ * HRP5pRLQPController remains responsible for the mc_rtc lifecycle.
  * RLPolicyRuntime owns everything that is policy-dependent.
  */
 class RLPolicyRuntime
@@ -42,77 +42,192 @@ public:
   RLPolicyRuntime();
 
   void configure(const mc_rtc::Configuration & controllerConfig,
-                 NewRLQPController & ctl,
+                 HRP5pRLQPController & ctl,
                  const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
-  void reset(NewRLQPController & ctl);
-  void runPolicyStepIfNeeded(NewRLQPController & ctl, double dt);
+  void reset(HRP5pRLQPController & ctl);
+  void runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt);
 
-  void reloadCurrentPolicy(NewRLQPController & ctl,
-                           const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
+  void reloadCurrentPolicy(HRP5pRLQPController & ctl, const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
   void loadPolicyByName(const std::string & policyName,
-                        NewRLQPController & ctl,
+                        HRP5pRLQPController & ctl,
                         const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
-  void loadNextPolicy(NewRLQPController & ctl,
-                      const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
+  void loadNextPolicy(HRP5pRLQPController & ctl, const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
-  bool policyLoaded() const { return policy_ && policy_->isLoaded(); }
+  bool policyLoaded() const
+  {
+    return policy_ && policy_->isLoaded();
+  }
 
-  const std::string & currentPolicyName() const { return policyManager_.currentName(); }
-  const std::vector<std::string> & availablePolicyNames() const { return policyManager_.names(); }
-  const std::string & currentPolicyFolder() const { return policyManager_.current().folder; }
-  const std::string & conventionName() const { return observationManager_.conventionName(); }
+  const std::string & currentPolicyName() const
+  {
+    return policyManager_.currentName();
+  }
+  const std::vector<std::string> & availablePolicyNames() const
+  {
+    return policyManager_.names();
+  }
+  const std::string & currentPolicyFolder() const
+  {
+    return policyManager_.current().folder;
+  }
+  const std::string & conventionName() const
+  {
+    return observationManager_.conventionName();
+  }
 
   int observationSize() const;
   int actionSize() const;
 
-  double policyStepSize() const { return policyStepSize_; }
-  double phase() const { return phaseNormalized_; }
+  double policyStepSize() const
+  {
+    return policyStepSize_;
+  }
+  double phase() const
+  {
+    return phaseNormalized_;
+  }
 
-  bool useQP() const { return useQP_; }
-  void setUseQP(bool useQP) { useQP_ = useQP; }
+  bool useQP() const
+  {
+    return useQP_;
+  }
+  void setUseQP(bool useQP)
+  {
+    useQP_ = useQP;
+  }
 
-  const Eigen::VectorXd & q_rl() const { return q_rl_; }
-  const Eigen::VectorXd & q_zero() const { return q_zero_; }
-  const Eigen::VectorXd & currentObservation() const { return currentObservation_; }
-  const Eigen::VectorXd & currentAction() const { return currentAction_; }
-  const Eigen::VectorXd & currentActionScaled() const { return currentActionScaled_; }
-  const Eigen::VectorXd & actionScale() const { return actionScale_; }
+  bool isTorqueControl() const
+  {
+    return isTorqueControl_;
+  }
 
-  const Eigen::VectorXd & kp() const { return kp_; }
-  const Eigen::VectorXd & kd() const { return kd_; }
-  const Eigen::VectorXd & kpBase() const { return kpBase_; }
-  const Eigen::VectorXd & kdBase() const { return kdBase_; }
+  const Eigen::VectorXd & q_rl() const
+  {
+    return q_rl_;
+  }
+  const Eigen::VectorXd & q_zero() const
+  {
+    return q_zero_;
+  }
+  const Eigen::VectorXd & currentObservation() const
+  {
+    return currentObservation_;
+  }
+  const Eigen::VectorXd & currentAction() const
+  {
+    return currentAction_;
+  }
+  const Eigen::VectorXd & currentActionScaled() const
+  {
+    return currentActionScaled_;
+  }
+  const Eigen::VectorXd & actionScale() const
+  {
+    return actionScale_;
+  }
 
-  double pdGainsRatio() const { return pdGainsRatio_; }
+  const Eigen::VectorXd & kp() const
+  {
+    return kp_;
+  }
+  const Eigen::VectorXd & kd() const
+  {
+    return kd_;
+  }
+  const Eigen::VectorXd & kpBase() const
+  {
+    return kpBase_;
+  }
+  const Eigen::VectorXd & kdBase() const
+  {
+    return kdBase_;
+  }
+  Eigen::VectorXd & highKpBase()
+  {
+    return highKpBase_;
+  }
+  Eigen::VectorXd & highKdBase()
+  {
+    return highKdBase_;
+  }
 
-  void setPDGainsRatio(double ratio,
-                       const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
+  bool controlModeChanged() const
+  {
+    return controlModeChanged_;
+  }
+  void setControlModeChanged(bool new_control_mode)
+  {
+    controlModeChanged_ = new_control_mode;
+  }
+  bool isFloatingBaseReal() const
+  {
+    return isFloatingBaseReal_;
+  }
+  void setIsFloatingBaseReal(bool new_value)
+  {
+    isFloatingBaseReal_ = new_value;
+  }
 
-  Eigen::Vector3d & command() { return command_; }
-  const Eigen::Vector3d & command() const { return command_; }
+  bool contactModeChanged() const
+  {
+    return contactModeChanged_;
+  }
+  void setContactModeChanged(bool new_value)
+  {
+    contactModeChanged_ = new_value;
+  }
+  bool contactConstraintsAreEnabled() const
+  {
+    return contactConstraintsAreEnabled_;
+  }
+  void setContactConstraintsAreEnabled(bool new_value)
+  {
+    contactConstraintsAreEnabled_ = new_value;
+  }
+
+  double pdGainsRatio() const
+  {
+    return pdGainsRatio_;
+  }
+
+  void setPDGainsRatio(double ratio, const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
+
+  Eigen::Vector3d & command()
+  {
+    return command_;
+  }
+  const Eigen::Vector3d & command() const
+  {
+    return command_;
+  }
+
+  void setHighPDGains(bool high);
+
+  void activateContactConstraints(bool activate);
+  void activateTorqueControl(bool activate);
 
 private:
   void loadPolicy(const std::string & policyName,
-                  NewRLQPController & ctl,
+                  HRP5pRLQPController & ctl,
                   const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
   void configureControl(const PolicyConfig & policy,
-                        NewRLQPController & ctl,
+                        HRP5pRLQPController & ctl,
                         const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask);
 
-  void configureAction(const PolicyConfig & policy, NewRLQPController & ctl);
+  void configureAction(const PolicyConfig & policy, HRP5pRLQPController & ctl);
   void configureNetwork(const PolicyConfig & policy);
-  void configureObservations(const PolicyConfig & policy, NewRLQPController & ctl);
+  void configureObservations(const PolicyConfig & policy, HRP5pRLQPController & ctl);
 
-  void resetObservationHistory(NewRLQPController & ctl);
-  Eigen::VectorXd computeObservation(NewRLQPController & ctl);
+  void resetObservationHistory(HRP5pRLQPController & ctl);
+  Eigen::VectorXd computeObservation(HRP5pRLQPController & ctl);
 
   void validateObservationAgainstNetwork() const;
-  ObservationContext makeObservationContext(NewRLQPController & ctl);
-  mc_rbdyn::Robot & selectedObservationRobot(NewRLQPController & ctl);
+  ObservationContext makeObservationContext(HRP5pRLQPController & ctl);
+  mc_rbdyn::Robot & selectedObservationRobot(HRP5pRLQPController & ctl);
 
 private:
   mc_rtc::Configuration controllerConfig_;
@@ -133,7 +248,8 @@ private:
   std::string observationSource_ = "realRobot";
 
   std::vector<std::string> controllerJointOrder_;
-  /** @brief Maps active policy action index to controllerJointOrder_ index. policyJointControllerIndices in ObservationContext. */
+  /** @brief Maps active policy action index to controllerJointOrder_ index. policyJointControllerIndices in
+   * ObservationContext. */
   std::vector<int> actionToControllerMap_;
 
   /** @brief Controller-order joint indices that are actually allowed to receive the policy action. */
@@ -150,10 +266,20 @@ private:
   Eigen::VectorXd kd_;
   Eigen::VectorXd kpBase_;
   Eigen::VectorXd kdBase_;
+  Eigen::VectorXd highKpBase_; // Base High gain PD gains from config
+  Eigen::VectorXd highKdBase_; // Base High gain PD gains from config
+
+  bool controlModeChanged_ = false;
+  bool isFloatingBaseReal_ = false;
+
+  bool contactModeChanged_ = true;
+  bool contactConstraintsAreEnabled_ = true;
 
   Eigen::Vector3d command_ = Eigen::Vector3d::Zero();
 
   bool useQP_ = true;
+  bool isTorqueControl_ = false;
+
   double policyStepSize_ = 0.02;
   double policyTimer_ = 0.0;
 

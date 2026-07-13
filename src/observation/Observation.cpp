@@ -16,16 +16,14 @@ namespace rlqp
 namespace
 {
 template<typename T>
-std::shared_ptr<Observation> makeObservation(const ObservationConfig & config,
-                                             const ObservationConvention & convention)
+std::shared_ptr<Observation> makeObservation(const ObservationConfig & config, const ObservationConvention & convention)
 {
   return std::shared_ptr<Observation>(new T(config, convention));
 }
 
 mc_rtc::Configuration loadConventionRoot(const mc_rtc::Configuration & controllerConfig)
 {
-  if(controllerConfig.has("conventions"))
-    return controllerConfig;
+  if(controllerConfig.has("conventions")) return controllerConfig;
   std::string policiesRoot = "policies/";
   controllerConfig("policies_root", policiesRoot);
   const std::string conventionsPath = policiesRoot + "/conventions.yaml";
@@ -49,40 +47,33 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
   mc_rtc::Configuration conventions = conventionRoot("conventions");
 
   if(!conventions.has(conventionName))
-    mc_rtc::log::error_and_throw(
-      "[ObservationConvention] Requested convention '{}' does not exist",
-      conventionName);
+    mc_rtc::log::error_and_throw("[ObservationConvention] Requested convention '{}' does not exist", conventionName);
 
   mc_rtc::Configuration cfg = conventions(conventionName);
 
   auto loadJointGroups = [&out](const mc_rtc::Configuration & source)
   {
-    if(!source.has("joint_groups"))
-      return;
+    if(!source.has("joint_groups")) return;
 
     mc_rtc::Configuration groups = source("joint_groups");
     std::vector<std::string> keys = groups.keys();
 
-    for(size_t i = 0; i < keys.size(); ++i)
-      out.jointGroups[keys[i]] = groups(keys[i], std::vector<std::string>());
+    for(size_t i = 0; i < keys.size(); ++i) out.jointGroups[keys[i]] = groups(keys[i], std::vector<std::string>());
   };
 
   auto loadObservationDefaults = [&out](const mc_rtc::Configuration & source)
   {
-    if(!source.has("observation_defaults"))
-      return;
+    if(!source.has("observation_defaults")) return;
 
     mc_rtc::Configuration defaults = source("observation_defaults");
     std::vector<std::string> keys = defaults.keys();
 
-    for(size_t i = 0; i < keys.size(); ++i)
-      out.defaultParameters[keys[i]] = defaults(keys[i]);
+    for(size_t i = 0; i < keys.size(); ++i) out.defaultParameters[keys[i]] = defaults(keys[i]);
   };
 
   auto loadTypeAliases = [&out](const mc_rtc::Configuration & source)
   {
-    if(!source.has("type_aliases"))
-      return;
+    if(!source.has("type_aliases")) return;
 
     mc_rtc::Configuration aliases = source("type_aliases");
     std::vector<std::string> keys = aliases.keys();
@@ -112,25 +103,23 @@ ObservationConvention ObservationConvention::fromConfig(const mc_rtc::Configurat
 std::string ObservationConvention::resolveType(const std::string & requestedType) const
 {
   std::map<std::string, std::string>::const_iterator it = typeAliases.find(requestedType);
-  if(it == typeAliases.end())
-    return requestedType;
+  if(it == typeAliases.end()) return requestedType;
 
   return it->second;
 }
 
 std::vector<int> ObservationConvention::resolveJointControllerIndices(
-  const mc_rtc::Configuration & parameters,
-  const std::vector<std::string> & controllerJointOrder,
-  const std::vector<int> & fallbackIndices) const
+    const mc_rtc::Configuration & parameters,
+    const std::vector<std::string> & controllerJointOrder,
+    const std::vector<int> & fallbackIndices) const
 {
   // Helper: map a joint name to its index in controllerJointOrder
   auto nameToIdx = [&](const std::string & name) -> int
   {
     std::vector<std::string>::const_iterator it =
-      std::find(controllerJointOrder.begin(), controllerJointOrder.end(), name);
+        std::find(controllerJointOrder.begin(), controllerJointOrder.end(), name);
     if(it == controllerJointOrder.end())
-      mc_rtc::log::error_and_throw(
-        "[ObservationConvention] Joint '{}' not found in controllerJointOrder", name);
+      mc_rtc::log::error_and_throw("[ObservationConvention] Joint '{}' not found in controllerJointOrder", name);
     return static_cast<int>(std::distance(controllerJointOrder.begin(), it));
   };
 
@@ -139,14 +128,12 @@ std::vector<int> ObservationConvention::resolveJointControllerIndices(
   if(!groupName.empty())
   {
     // Check RL convention groups (e.g. mjlab.joint_groups.legs)
-    std::map<std::string, std::vector<std::string> >::const_iterator rlIt =
-      jointGroups.find(groupName);
+    std::map<std::string, std::vector<std::string>>::const_iterator rlIt = jointGroups.find(groupName);
     if(rlIt != jointGroups.end())
     {
       std::vector<int> out;
       out.reserve(rlIt->second.size());
-      for(size_t i = 0; i < rlIt->second.size(); ++i)
-        out.push_back(nameToIdx(rlIt->second[i]));
+      for(size_t i = 0; i < rlIt->second.size(); ++i) out.push_back(nameToIdx(rlIt->second[i]));
       return out;
     }
   }
@@ -157,8 +144,7 @@ std::vector<int> ObservationConvention::resolveJointControllerIndices(
   {
     std::vector<int> out;
     out.reserve(names.size());
-    for(size_t i = 0; i < names.size(); ++i)
-      out.push_back(nameToIdx(names[i]));
+    for(size_t i = 0; i < names.size(); ++i) out.push_back(nameToIdx(names[i]));
     return out;
   }
 
@@ -166,9 +152,9 @@ std::vector<int> ObservationConvention::resolveJointControllerIndices(
 }
 
 mc_rtc::Configuration ObservationConvention::resolveObservationParameters(
-  const std::string & requestedType,
-  const std::string & internalType,
-  const mc_rtc::Configuration & localParameters) const
+    const std::string & requestedType,
+    const std::string & internalType,
+    const mc_rtc::Configuration & localParameters) const
 {
   mc_rtc::Configuration out;
 
@@ -178,14 +164,12 @@ mc_rtc::Configuration ObservationConvention::resolveObservationParameters(
   else
   {
     std::map<std::string, mc_rtc::Configuration>::const_iterator internalIt = defaultParameters.find(internalType);
-    if(internalIt != defaultParameters.end())
-      out = internalIt->second;
+    if(internalIt != defaultParameters.end()) out = internalIt->second;
   }
 
   std::vector<std::string> keys = localParameters.keys();
 
-  for(size_t i = 0; i < keys.size(); ++i)
-    out.add(keys[i], localParameters(keys[i]));
+  for(size_t i = 0; i < keys.size(); ++i) out.add(keys[i], localParameters(keys[i]));
 
   return out;
 }
@@ -202,25 +186,21 @@ Observation::Observation(const ObservationConfig & config, const ObservationConv
   }
 }
 
-Observation::~Observation()
-{
-}
+Observation::~Observation() {}
 
 Eigen::VectorXd Observation::readScale(const mc_rtc::Configuration & parameters,
-                                             const std::string & key,
-                                             int size,
-                                             double fallback) const
+                                       const std::string & key,
+                                       int size,
+                                       double fallback) const
 {
-  if(!parameters.has(key))
-    return Eigen::VectorXd::Constant(size, fallback);
+  if(!parameters.has(key)) return Eigen::VectorXd::Constant(size, fallback);
 
   const std::vector<double> values = parameters(key, std::vector<double>());
-  if (values.size() != 0)
+  if(values.size() != 0)
   {
-    if (values.size() != static_cast<size_t>(size))
-      mc_rtc::log::error("[Observation:{}] Parameter '{}' has size {}, expected {}",
-        name(), key, values.size(),size);
-        
+    if(values.size() != static_cast<size_t>(size))
+      mc_rtc::log::error("[Observation:{}] Parameter '{}' has size {}, expected {}", name(), key, values.size(), size);
+
     Eigen::VectorXd out(size);
     return Eigen::Map<const Eigen::VectorXd>(values.data(), values.size());
   }
@@ -235,11 +215,9 @@ Eigen::VectorXd Observation::readScale(const mc_rtc::Configuration & parameters,
 //============================================================================//
 void ObservationRegistry::registerType(const std::string & type, ObservationFactory factory)
 {
-  if(type.empty())
-    mc_rtc::log::error_and_throw("[ObservationRegistry] Cannot register an empty observation type");
+  if(type.empty()) mc_rtc::log::error_and_throw("[ObservationRegistry] Cannot register an empty observation type");
 
-  if(!factory)
-    mc_rtc::log::error_and_throw("[ObservationRegistry] Cannot register null factory for '{}'", type);
+  if(!factory) mc_rtc::log::error_and_throw("[ObservationRegistry] Cannot register null factory for '{}'", type);
 
   if(factories_.find(type) != factories_.end())
     mc_rtc::log::error_and_throw("[ObservationRegistry] Observation type '{}' is already registered", type);
@@ -258,13 +236,10 @@ std::shared_ptr<Observation> ObservationRegistry::create(const ObservationConfig
     for(size_t i = 0; i < knownTypes().size(); ++i)
     {
       os << knownTypes()[i];
-      if(i + 1 < knownTypes().size())
-        os << ", ";
+      if(i + 1 < knownTypes().size()) os << ", ";
     }
-    mc_rtc::log::error_and_throw(
-      "[ObservationRegistry] Unknown observation type '{}'. Known types are: {}",
-      config.type,
-      os.str());
+    mc_rtc::log::error_and_throw("[ObservationRegistry] Unknown observation type '{}'. Known types are: {}",
+                                 config.type, os.str());
   }
 
   return it->second(config, convention);
@@ -274,9 +249,7 @@ std::vector<std::string> ObservationRegistry::knownTypes() const
 {
   std::vector<std::string> out;
 
-  for(std::map<std::string, ObservationFactory>::const_iterator it = factories_.begin();
-      it != factories_.end();
-      ++it)
+  for(std::map<std::string, ObservationFactory>::const_iterator it = factories_.begin(); it != factories_.end(); ++it)
     out.push_back(it->first);
 
   return out;
@@ -295,6 +268,7 @@ ObservationRegistry makeDefaultObservationRegistry()
   registry.registerType("phase", &makeObservation<PhaseObservation>);
   registry.registerType("last_action", &makeObservation<LastActionObservation>);
   registry.registerType("command", &makeObservation<CommandObservation>);
+  registry.registerType("force_sensor", &makeObservation<ForceSensorObservation>);
 
   return registry;
 }

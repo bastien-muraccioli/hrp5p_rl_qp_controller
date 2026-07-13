@@ -41,10 +41,16 @@ public:
   Eigen::VectorXd compute(const ObservationContext & context);
 
   /** @brief Full flattened observation size */
-  int size() const {return size_;};
+  int size() const
+  {
+    return size_;
+  };
 
   /** @brief Active convention name. */
-  const std::string & conventionName() const {return convention_.name;};
+  const std::string & conventionName() const
+  {
+    return convention_.name;
+  };
 
 private:
   /** @brief Keeps track of an Observation's history (ex: [joint_pos[t], joint_pos[t-1], joint_pose[t-2]]) */
@@ -52,9 +58,11 @@ private:
   {
     std::shared_ptr<Observation> observation;
     std::deque<Eigen::VectorXd> historyBuffer;
+    bool newest_first = true;
   };
 
-  /** @brief parse observations.yaml. Handles entries history here and leave observation-specific to respective Observation class */
+  /** @brief parse observations.yaml. Handles entries history here and leave observation-specific to respective
+   * Observation class */
   ObservationConfig parseObservationConfig(const mc_rtc::Configuration & config) const;
   Eigen::VectorXd flattenHistory(const Entry & entry) const;
 

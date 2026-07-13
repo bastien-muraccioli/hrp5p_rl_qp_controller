@@ -126,6 +126,7 @@ conventions:
       joint_vel_rel: joint_vel
       last_action: last_action
       generated_commands: command
+      builtin_sensor: force_sensor
 
     observation_defaults:
       base_lin_vel:

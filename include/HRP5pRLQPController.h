@@ -1,13 +1,14 @@
 #pragma once
 
+#include "api.h"
 #include "policy/RLPolicyRuntime.h"
 #include "policy/RLStateRunner.h"
-#include "api.h"
 
 #include <Eigen/Core>
 
 #include <mc_control/fsm/Controller.h>
 #include <mc_rtc/Configuration.h>
+#include <mc_tasks/CompliantPostureTask.h>
 #include <mc_tasks/TorqueJointTask.h>
 
 #include <memory>
@@ -45,7 +46,7 @@
  * ## Configuration
  *
  * All parameters are loaded from YAML config files :
- * etc/NewRLQPController.in.yaml :
+ * etc/HRP5pRLQPController.in.yaml :
  *  - policies root directory     Path where policy directories will be search for
  *  - default policy              Name of the first policy to run
  * {policy_root}/{policy_name} :
@@ -72,21 +73,33 @@
  * @see RLPolicyInterface.h for ONNX inference wrapper.
  */
 
-struct NewRLQPController_DLLAPI NewRLQPController : public mc_control::fsm::Controller
+struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::Controller
 {
-  NewRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config);
+  HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config);
 
   bool run() override;
   void reset(const mc_control::ControllerResetData & reset_data) override;
 
+  bool manageModeSwitching();
+
   /** @brief Enable or disable the CBF-QP layer at runtime. */
   void activateQPControl(bool activate);
+
+  void torqueTask_setHighPDGains(bool high);
+
+  void activateExternalTorqueComputation(bool activate);
+
+  void updateFootContactsFromForceSensors();
 
   rlqp::RLPolicyRuntime & rlRuntime();
   const rlqp::RLPolicyRuntime & rlRuntime() const;
 
   /** @brief Torque-space whole-body task fed into the CBF-QP solver. */
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
+  std::shared_ptr<mc_tasks::PostureTask> postureTask;
+  std::shared_ptr<mc_tasks::CompliantPostureTask> compliantPostureTask;
+
+  std::map<std::string, std::vector<double>> defaultPostureTarget; // q0
 
   /** @brief Total number of actuated joints (from robot().refJointOrder()). */
   int nbActuatedJoints = 0;
@@ -109,7 +122,7 @@ private:
   /** @brief Register GUI elements visible in RViz and mc_mujoco. */
   void addGui();
   /** @brief Load robot parameters from config. */
-  void initializeRobotBasics();
+  void initializeRobotBasics(const mc_rtc::Configuration & config);
 
   /**
    * @brief Apply RL torques directly, bypassing the QP (useQP=false mode).
@@ -120,8 +133,6 @@ private:
   bool byPassQPControl();
   /** @brief Log warnings when joint position/velocity/torque limits are exceeded. */
   void computeLimits();
-
-  std::pair<sva::PTransformd, Eigen::Vector3d>  createContactAnchor(const mc_rbdyn::Robot & anchorRobot);
 
 private:
   bool printLimits_ = true;
@@ -134,7 +145,7 @@ private:
   double diPercent_ = 0.1; // Doesn't matter since di > ds. This variable is not used in the constraint dynamics.
 
   // --- CBF Gains ---
-  // More details are explained in the paper cf. Readme.md. 
+  // More details are explained in the paper cf. Readme.md.
   // Must be tuned depending on the robot.
   double zeta_jointLimit_ = 1.2;
   double lambda_jointLimit_ = 200.0; // Same gain for joint position limits and velocity limits.
@@ -143,6 +154,29 @@ private:
 
   rlqp::RLPolicyRuntime rlRuntime_;
 
-  // Anchor from for tilt estimation
-  sva::PTransformd contactAnchorTf_;
+  struct SchmittTrigger
+  {
+    double threshold_on = 50.0; // [N] force norm to switch ON
+    double threshold_off = 20.0; // [N] force norm to switch OFF
+    bool state = false;
+
+    bool update(double forceNorm)
+    {
+      if(!state && forceNorm >= threshold_on) state = true;
+      if(state && forceNorm < threshold_off) state = false;
+      return state;
+    }
+  };
+
+  SchmittTrigger leftFootSchmitt_;
+  SchmittTrigger rightFootSchmitt_;
+  double leftFootForceNorm_ = 0.0;
+  double rightFootForceNorm_ = 0.0;
+  double footForceEpsilon_ = 100.0; // [N] balance threshold for single/double support
+
+  double tau_pos_ = 2.0; // [s] position correction time constant
+  double tau_vel_ = 5.0; // [s] velocity correction time constant
+
+  bool prevLeftContact_ = false;
+  bool prevRightContact_ = false;
 };

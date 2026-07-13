@@ -1,6 +1,6 @@
 #include "policy/RLPolicyRuntime.h"
 
-#include "NewRLQPController.h"
+#include "HRP5pRLQPController.h"
 
 #include <mc_rtc/logging.h>
 
@@ -12,12 +12,10 @@
 namespace rlqp
 {
 
-RLPolicyRuntime::RLPolicyRuntime()
-{
-}
+RLPolicyRuntime::RLPolicyRuntime() {}
 
 void RLPolicyRuntime::configure(const mc_rtc::Configuration & controllerConfig,
-                                NewRLQPController & ctl,
+                                HRP5pRLQPController & ctl,
                                 const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   controllerConfig_ = controllerConfig;
@@ -31,7 +29,9 @@ void RLPolicyRuntime::configure(const mc_rtc::Configuration & controllerConfig,
   }
 
   if(observationSource_ != "realRobot" && observationSource_ != "robot")
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime] Invalid robot.observation_source '{}'. Expected 'realRobot' or 'robot'.", observationSource_);
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime] Invalid robot.observation_source '{}'. Expected 'realRobot' or 'robot'.",
+        observationSource_);
 
   const int nbActuatedJoints = static_cast<int>(controllerJointOrder_.size());
 
@@ -51,7 +51,7 @@ void RLPolicyRuntime::configure(const mc_rtc::Configuration & controllerConfig,
   loadPolicy(policyManager_.currentName(), ctl, torqueTask);
 }
 
-void RLPolicyRuntime::reset(NewRLQPController & ctl)
+void RLPolicyRuntime::reset(HRP5pRLQPController & ctl)
 {
   phaseElapsedTime_ = 0.0;
   phaseNormalized_ = 0.0;
@@ -59,7 +59,7 @@ void RLPolicyRuntime::reset(NewRLQPController & ctl)
   policyTimer_ = policyStepSize_;
 }
 
-void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
+void RLPolicyRuntime::runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt)
 {
   if(!policyLoaded())
   {
@@ -70,23 +70,27 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
   policyTimer_ += dt;
   phaseElapsedTime_ += dt;
 
-  if(phasePeriod_ > 0.0)
-    phaseNormalized_ = std::fmod(phaseElapsedTime_ / phasePeriod_, 1.0);
+  if(phasePeriod_ > 0.0) phaseNormalized_ = std::fmod(phaseElapsedTime_ / phasePeriod_, 1.0);
 
-  if(policyTimer_ < policyStepSize_) { return; }
+  if(policyTimer_ < policyStepSize_)
+  {
+    return;
+  }
 
   currentObservation_ = computeObservation(ctl);
 
   if(currentObservation_.size() != policy_->getObservationSize())
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime] Observation size mismatch. ObservationManager produced {}, ONNX expects {}.",
-      currentObservation_.size(), policy_->getObservationSize());
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime] Observation size mismatch. ObservationManager produced {}, ONNX expects {}.",
+        currentObservation_.size(), policy_->getObservationSize());
 
   currentAction_ = policy_->predict(currentObservation_);
   // mc_rtc::log::warning("TEST {}", currentAction_);
 
   if(currentAction_.size() != static_cast<int>(actionToControllerMap_.size()))
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime] Action size mismatch. ONNX produced {}, active action mapping expects {} joints.",
-      currentAction_.size(), actionToControllerMap_.size());
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime] Action size mismatch. ONNX produced {}, active action mapping expects {} joints.",
+        currentAction_.size(), actionToControllerMap_.size());
 
   currentActionScaled_.setZero();
   q_rl_ = q_zero_;
@@ -96,9 +100,8 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
     const int dofIndex = actionToControllerMap_[static_cast<size_t>(actionIndex)];
 
     currentActionScaled_(dofIndex) = actionScale_(dofIndex) * currentAction_(actionIndex);
-    if(std::find(controlledActionControllerIndices_.begin(),
-                 controlledActionControllerIndices_.end(),
-                 dofIndex) != controlledActionControllerIndices_.end())
+    if(std::find(controlledActionControllerIndices_.begin(), controlledActionControllerIndices_.end(), dofIndex)
+       != controlledActionControllerIndices_.end())
     {
       q_rl_(dofIndex) = currentActionScaled_(dofIndex) + q_zero_(dofIndex);
     }
@@ -107,22 +110,25 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(NewRLQPController & ctl, double dt)
   policyTimer_ = 0.0;
 }
 
-void RLPolicyRuntime::reloadCurrentPolicy(NewRLQPController & ctl,
+void RLPolicyRuntime::reloadCurrentPolicy(HRP5pRLQPController & ctl,
                                           const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   loadPolicy(policyManager_.currentName(), ctl, torqueTask);
 }
 
 void RLPolicyRuntime::loadPolicyByName(const std::string & policyName,
-                                       NewRLQPController & ctl,
+                                       HRP5pRLQPController & ctl,
                                        const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
-  if(policyName == policyManager_.currentName()) { return; }
+  if(policyName == policyManager_.currentName())
+  {
+    return;
+  }
 
   loadPolicy(policyName, ctl, torqueTask);
 }
 
-void RLPolicyRuntime::loadNextPolicy(NewRLQPController & ctl,
+void RLPolicyRuntime::loadNextPolicy(HRP5pRLQPController & ctl,
                                      const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   policyManager_.selectNext();
@@ -131,18 +137,23 @@ void RLPolicyRuntime::loadNextPolicy(NewRLQPController & ctl,
 
 int RLPolicyRuntime::observationSize() const
 {
-  if(policyLoaded()) { return policy_->getObservationSize(); }
+  if(policyLoaded())
+  {
+    return policy_->getObservationSize();
+  }
   return static_cast<int>(currentObservation_.size());
 }
 
 int RLPolicyRuntime::actionSize() const
 {
-  if(policyLoaded()) { return policy_->getActionSize(); }
+  if(policyLoaded())
+  {
+    return policy_->getActionSize();
+  }
   return static_cast<int>(currentAction_.size());
 }
 
-void RLPolicyRuntime::setPDGainsRatio(double ratio,
-                                      const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
+void RLPolicyRuntime::setPDGainsRatio(double ratio, const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   pdGainsRatio_ = ratio;
   kp_ = pdGainsRatio_ * kpBase_;
@@ -155,8 +166,51 @@ void RLPolicyRuntime::setPDGainsRatio(double ratio,
   }
 }
 
+void RLPolicyRuntime::setHighPDGains(bool high)
+{
+  if(high)
+  {
+    kp_ = highKpBase_;
+    kd_ = highKdBase_;
+  }
+  else
+  {
+    kp_ = pdGainsRatio_ * kpBase_;
+    kd_ = sqrt(pdGainsRatio_) * kdBase_;
+  }
+}
+
+void RLPolicyRuntime::activateContactConstraints(bool activate)
+{
+  if(activate && !contactConstraintsAreEnabled_)
+  {
+    contactConstraintsAreEnabled_ = true;
+    contactModeChanged_ = true;
+  }
+  else if(!activate && contactConstraintsAreEnabled_)
+  {
+    contactConstraintsAreEnabled_ = false;
+    contactModeChanged_ = true;
+  }
+}
+
+void RLPolicyRuntime::activateTorqueControl(bool activate)
+{
+  if(activate && !isTorqueControl_)
+  {
+    isTorqueControl_ = true;
+    isFloatingBaseReal_ = false;
+    controlModeChanged_ = true;
+  }
+  else if(!activate && isTorqueControl_)
+  {
+    isTorqueControl_ = false;
+    controlModeChanged_ = true;
+  }
+}
+
 void RLPolicyRuntime::loadPolicy(const std::string & policyName,
-                                 NewRLQPController & ctl,
+                                 HRP5pRLQPController & ctl,
                                  const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   policyManager_.select(policyName);
@@ -167,8 +221,7 @@ void RLPolicyRuntime::loadPolicy(const std::string & policyName,
 
   configureControl(policy, ctl, torqueTask);
 
-  const std::string conventionName =
-    policy.observationsConfiguration("training_convention", std::string("mjlab"));
+  const std::string conventionName = policy.observationsConfiguration("training_convention", std::string("mjlab"));
   activeConvention_ = ObservationConvention::fromConfig(controllerConfig_, conventionName);
 
   configureAction(policy, ctl);
@@ -182,32 +235,30 @@ void RLPolicyRuntime::loadPolicy(const std::string & policyName,
 
   policyTimer_ = policyStepSize_;
 
-  mc_rtc::log::success(
-    "[RLPolicyRuntime] Policy '{}' loaded. Observation size: {}, action size: {}",
-    policy.name, currentObservation_.size(), currentAction_.size());
+  mc_rtc::log::success("[RLPolicyRuntime] Policy '{}' loaded. Observation size: {}, action size: {}", policy.name,
+                       currentObservation_.size(), currentAction_.size());
 }
 
 void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
-                                       NewRLQPController & ctl,
+                                       HRP5pRLQPController & ctl,
                                        const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   useQP_ = policy.useQP;
+  isTorqueControl_ = policy.isTorqueControl;
   policyStepSize_ = policy.policyStepSize;
   pdGainsRatio_ = policy.kpScale;
 
   phasePeriod_ = policy.observationsConfiguration("phase_period", 1.0);
-  
+
   if(policy.policyConfiguration.has("control"))
   {
     const mc_rtc::Configuration control = policy.policyConfiguration("control");
 
-    if(control.has("phase_period"))
-      control("phase_period", phasePeriod_);
+    if(control.has("phase_period")) control("phase_period", phasePeriod_);
   }
   if(phasePeriod_ <= 0.0)
-    mc_rtc::log::error_and_throw(
-      "[RLPolicyRuntime:{}] phase_period must be positive, got {}",
-      policy.name, phasePeriod_);
+    mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] phase_period must be positive, got {}", policy.name,
+                                 phasePeriod_);
 
   kpBase_.setZero();
   kdBase_.setZero();
@@ -225,30 +276,28 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   }
 }
 
-void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
-                                      NewRLQPController & ctl)
+void RLPolicyRuntime::configureAction(const PolicyConfig & policy, HRP5pRLQPController & ctl)
 {
   // Resolve action.joints to controller indices.
   // This is the ONNX action vector layout/size. Do not use controlled_joints here,
   // otherwise policies that output all joints but only apply legs will get a size mismatch.
   mc_rtc::Configuration actionSelector;
-  
-  if(!policy.actionJointGroup.empty())
-    actionSelector.add("joints", policy.actionJointGroup);
+
+  if(!policy.actionJointGroup.empty()) actionSelector.add("joints", policy.actionJointGroup);
 
   // Fallback: all controller joints in controller order
   std::vector<int> fullFallback(controllerJointOrder_.size());
   std::iota(fullFallback.begin(), fullFallback.end(), 0);
 
-  actionToControllerMap_ = activeConvention_.resolveJointControllerIndices(
-    actionSelector, controllerJointOrder_, fullFallback);
+  actionToControllerMap_ =
+      activeConvention_.resolveJointControllerIndices(actionSelector, controllerJointOrder_, fullFallback);
 
   // Resolve action.controlled_joints to controller indices.
   // This is the subset of the ONNX outputs that is actually applied to q_rl.
   mc_rtc::Configuration controlledSelector;
   controlledSelector.add("joints", policy.controlledJointGroup);
   controlledActionControllerIndices_ = activeConvention_.resolveJointControllerIndices(
-    controlledSelector, controllerJointOrder_, actionToControllerMap_);
+      controlledSelector, controllerJointOrder_, actionToControllerMap_);
 
   // controlled_joints must be a subset of action.joints: every controlled joint must
   // correspond to one output in the ONNX action vector.
@@ -257,18 +306,16 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     if(std::find(actionToControllerMap_.begin(), actionToControllerMap_.end(), controlledIndex)
        == actionToControllerMap_.end())
     {
-      mc_rtc::log::error_and_throw(
-        "[RLPolicyRuntime:{}] action.controlled_joints contains controller joint index {}, "
-        "but this joint is not present in action.joints",
-        policy.name,
-        controlledIndex);
+      mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] action.controlled_joints contains controller joint index {}, "
+                                   "but this joint is not present in action.joints",
+                                   policy.name, controlledIndex);
     }
   }
 
-  mc_rtc::log::info("[RLPolicyRuntime:{}] action.joints='{}' -> controller indices {}",
-                    policy.name, policy.actionJointGroup, actionToControllerMap_);
-  mc_rtc::log::info("[RLPolicyRuntime:{}] action.controlled_joints='{}' -> controller indices {}",
-                    policy.name, policy.controlledJointGroup, controlledActionControllerIndices_);
+  mc_rtc::log::info("[RLPolicyRuntime:{}] action.joints='{}' -> controller indices {}", policy.name,
+                    policy.actionJointGroup, actionToControllerMap_);
+  mc_rtc::log::info("[RLPolicyRuntime:{}] action.controlled_joints='{}' -> controller indices {}", policy.name,
+                    policy.controlledJointGroup, controlledActionControllerIndices_);
 
   q_zero_.setZero();
   q_rl_.setZero();
@@ -277,7 +324,7 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
 
   actionScale_ = Eigen::Map<const Eigen::VectorXd>(policy.actionScale.data(), policy.actionScale.size());
 
-  if (!policy.defaultPosition.empty())
+  if(!policy.defaultPosition.empty())
   {
     q_zero_ = Eigen::Map<const Eigen::VectorXd>(policy.defaultPosition.data(), policy.defaultPosition.size());
   }
@@ -286,11 +333,14 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
     size_t i = 0;
     std::shared_ptr<mc_tasks::PostureTask> FSMPostureTask = ctl.getPostureTask(ctl.robot().name());
     auto posture = FSMPostureTask->posture();
-    for (const auto& j : ctl.robot().mb().joints()) {
-      const std::string& joint_name = j.name();
-      if (j.type() == rbd::Joint::Type::Rev) {
-        if (const auto& t = posture[ctl.robot().jointIndexByName(joint_name)]; !t.empty()) {
-          q_zero_(i) =t[0];
+    for(const auto & j : ctl.robot().mb().joints())
+    {
+      const std::string & joint_name = j.name();
+      if(j.type() == rbd::Joint::Type::Rev)
+      {
+        if(const auto & t = posture[ctl.robot().jointIndexByName(joint_name)]; !t.empty())
+        {
+          q_zero_(i) = t[0];
           i++;
         }
       }
@@ -304,10 +354,8 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy,
 
     if(!ctl.robot().hasJoint(joint))
     {
-      mc_rtc::log::error_and_throw(
-        "[RLPolicyRuntime:{}] Resolved action joint '{}' does not exist on robot",
-        policy.name,
-        joint);
+      mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] Resolved action joint '{}' does not exist on robot",
+                                   policy.name, joint);
     }
   }
 
@@ -321,31 +369,31 @@ void RLPolicyRuntime::configureNetwork(const PolicyConfig & policy)
     policy_.reset(new RLPolicyInterface(policy.onnxPath));
 
     if(!policy_ || !policy_->isLoaded())
-      mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] RL policy creation failed for '{}'",
-        policy.name, policy.onnxPath);
+      mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] RL policy creation failed for '{}'", policy.name,
+                                   policy.onnxPath);
   }
   catch(const std::exception & e)
   {
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] Failed to load ONNX policy '{}': {}",
-      policy.name, policy.onnxPath, e.what()); 
+    mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] Failed to load ONNX policy '{}': {}", policy.name,
+                                 policy.onnxPath, e.what());
   }
 
   currentAction_ = Eigen::VectorXd::Zero(policy_->getActionSize());
 
   if(static_cast<int>(actionToControllerMap_.size()) != policy_->getActionSize())
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime:{}] Resolved action joint count ({}) does not match ONNX action size ({})",
-      policy.name, actionToControllerMap_.size(), policy_->getActionSize());
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime:{}] Resolved action joint count ({}) does not match ONNX action size ({})", policy.name,
+        actionToControllerMap_.size(), policy_->getActionSize());
 }
 
-void RLPolicyRuntime::configureObservations(const PolicyConfig & policy,
-                                            NewRLQPController & ctl)
+void RLPolicyRuntime::configureObservations(const PolicyConfig & policy, HRP5pRLQPController & ctl)
 {
   observationManager_.load(policy.observationsConfiguration, controllerConfig_, observationRegistry_);
   observationManager_.configure(makeObservationContext(ctl));
   currentObservation_ = Eigen::VectorXd::Zero(policy_->getObservationSize());
 }
 
-void RLPolicyRuntime::resetObservationHistory(NewRLQPController & ctl)
+void RLPolicyRuntime::resetObservationHistory(HRP5pRLQPController & ctl)
 {
   if(!policyLoaded())
   {
@@ -359,7 +407,7 @@ void RLPolicyRuntime::resetObservationHistory(NewRLQPController & ctl)
   currentObservation_ = observationManager_.compute(context);
 }
 
-Eigen::VectorXd RLPolicyRuntime::computeObservation(NewRLQPController & ctl)
+Eigen::VectorXd RLPolicyRuntime::computeObservation(HRP5pRLQPController & ctl)
 {
   ObservationContext context = makeObservationContext(ctl);
   return observationManager_.compute(context);
@@ -367,32 +415,30 @@ Eigen::VectorXd RLPolicyRuntime::computeObservation(NewRLQPController & ctl)
 
 void RLPolicyRuntime::validateObservationAgainstNetwork() const
 {
-  if(!policyLoaded())
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime] Cannot validate observation: no policy loaded");
+  if(!policyLoaded()) mc_rtc::log::error_and_throw("[RLPolicyRuntime] Cannot validate observation: no policy loaded");
 
   if(currentObservation_.size() != policy_->getObservationSize())
-    mc_rtc::log::error_and_throw("[RLPolicyRuntime] ObservationManager dimension ({}) does not match ONNX input size ({})",
-      currentObservation_.size(), policy_->getObservationSize());
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime] ObservationManager dimension ({}) does not match ONNX input size ({})",
+        currentObservation_.size(), policy_->getObservationSize());
 }
 
-ObservationContext RLPolicyRuntime::makeObservationContext(NewRLQPController & ctl)
+ObservationContext RLPolicyRuntime::makeObservationContext(HRP5pRLQPController & ctl)
 {
-  return ObservationContext{
-    selectedObservationRobot(ctl),
-    baseBody_,
-    controllerJointOrder_,
-    actionToControllerMap_,
-    q_zero_,
-    currentAction_,
-    command_,
-    phaseNormalized_,
-    activeConvention_};
+  return ObservationContext{selectedObservationRobot(ctl),
+                            baseBody_,
+                            controllerJointOrder_,
+                            actionToControllerMap_,
+                            q_zero_,
+                            currentAction_,
+                            command_,
+                            phaseNormalized_,
+                            activeConvention_};
 }
 
-mc_rbdyn::Robot & RLPolicyRuntime::selectedObservationRobot(NewRLQPController & ctl)
+mc_rbdyn::Robot & RLPolicyRuntime::selectedObservationRobot(HRP5pRLQPController & ctl)
 {
-  if(observationSource_ == "robot")
-    return ctl.robot();
+  if(observationSource_ == "robot") return ctl.robot();
   return ctl.realRobot(robotName_);
 }
 

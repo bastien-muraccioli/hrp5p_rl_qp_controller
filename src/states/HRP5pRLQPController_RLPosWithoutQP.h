@@ -2,7 +2,7 @@
 
 #include <mc_control/fsm/State.h>
 
-struct HRP5pRLQPController_Initial : mc_control::fsm::State
+struct HRP5pRLQPController_RLPosWithoutQP : mc_control::fsm::State
 {
 
   void configure(const mc_rtc::Configuration & config) override;

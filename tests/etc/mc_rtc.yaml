@@ -1,7 +1,7 @@
 # This configuration is used to run a few iterations of the controller
 MainRobot: JVRC1
-Enabled: NewRLQPController
+Enabled: HRP5pRLQPController
 
 IncludeHalfSitController: false
 ClearControllerModulePath: true
-ControllerModulePaths: ["$<TARGET_FILE_DIR:NewRLQPController>"]
+ControllerModulePaths: ["$<TARGET_FILE_DIR:HRP5pRLQPController>"]
