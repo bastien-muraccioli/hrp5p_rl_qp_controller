@@ -107,6 +107,7 @@ void HRP5pRLQPController::initializeRobotBasics(const mc_rtc::Configuration & co
 
   std::map<std::string, double> highKp_map = config("high_kp");
   std::map<std::string, double> highKd_map = config("high_kd");
+  is_initial_posture_rl = config("is_initial_posture_rl", false);
 
   std::vector<std::vector<double>> default_posture = postureTask->posture();
   auto & highKpBase = rlRuntime_.highKpBase();
@@ -120,7 +121,8 @@ void HRP5pRLQPController::initializeRobotBasics(const mc_rtc::Configuration & co
     highKpBase[static_cast<Eigen::Index>(i)] = highKp_map.at(joint_name);
     highKdBase[static_cast<Eigen::Index>(i)] = highKd_map.at(joint_name);
 
-    defaultPostureTarget["joint_name"] = default_posture[i];
+    if (const auto& t = default_posture[robot().jointIndexByName(joint_name)]; !t.empty())
+      defaultPostureTarget[joint_name] = t;
 
     i++;
   }

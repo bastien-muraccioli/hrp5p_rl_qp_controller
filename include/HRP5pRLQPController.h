@@ -100,6 +100,7 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   std::shared_ptr<mc_tasks::CompliantPostureTask> compliantPostureTask;
 
   std::map<std::string, std::vector<double>> defaultPostureTarget; // q0
+  bool is_initial_posture_rl = false;
 
   /** @brief Total number of actuated joints (from robot().refJointOrder()). */
   int nbActuatedJoints = 0;

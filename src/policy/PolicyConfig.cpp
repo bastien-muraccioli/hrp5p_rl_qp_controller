@@ -196,6 +196,8 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
 
   if(out.controlledJointGroup.empty()) out.controlledJointGroup = out.actionJointGroup;
 
+  mc_rtc::log::warning("TEST {} {}", actionScale_map.size(), out.actionScale.size());
+  mc_rtc::log::error(out.actionScale);
   out.validate();
   return out;
 }
