@@ -26,40 +26,51 @@ collisions:
     useMinimal: true
 
 ObserverPipelines:
-  name: MainPipeline
+  name: "ObserverPipeline"
   gui: true
   log: true
-
   observers:
     - type: Encoder
-      config:
-          velocity: encoderVelocities
+      velocity: encoderFiniteDifferences
+      # velocity: encoderVelocities
+                          # - type: Tilt
+                          #   required: true
+                          #   update: true
+                          #   filterGains:
+                          #     initAlpha: 4
+                          #     initBeta: 4
+                          #     initGamma: 1
+                          #     finalAlpha: 4
+                          #     finalBeta: 4
+                          #     finalGamma: 1
+                          #   contacts:
+                          #     contactsDetection: Surfaces
+                          #     surfacesForContactDetection: [RightFootCenter, LeftFootCenter]
     - type: BodySensor
       update: true
       bodySensor: FloatingBase
-    - type: Tilt
-      required: true
-      update: true
-      config:
-        anchorFrameFunction: anchorFrameFunction
-        filterGains:
-          initAlpha: 2
-          initBeta: 2
-          initGamma: 1
-          finalAlpha: 2
-          finalBeta: 2
-          finalGamma: 1
+      updateAcc: true
     - type: ExternalForcesObserver
-      estimation_method: MomentumObserver
-      use_forces_from_ft_sensors: false
-      residual_gain: 100
-      torque_source_type: CommandedTorque
+      is_active: false
+      estimation_method: ForceSensorBased    # MomentumObserver, ForceSensorBased
+      torque_source_type: MotorTorqueMeasurement
+      residual_gain: 50.0
 
+constraints:
+  - type: contact
+    contactType: acceleration
+  - type: compoundJoint
+
+collisions:
+- type: collision
+  useMinimal: true
 
 states: {}
 
 transitions:
   - [HRP5pRLQPController_Initial, OK, HRP5pRLQPController_Initial, Strict]
+  - [HRP5pRLQPController_Initial, RL, HRP5pRLQPController_RL, Strict]
+  - [HRP5pRLQPController_RL, OK, HRP5pRLQPController_Initial, Strict]
 
 init: HRP5pRLQPController_Initial
 
