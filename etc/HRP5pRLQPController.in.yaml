@@ -61,10 +61,6 @@ constraints:
     contactType: acceleration
   - type: compoundJoint
 
-collisions:
-- type: collision
-  useMinimal: true
-
 states: {}
 
 transitions:
@@ -78,7 +74,7 @@ policies_root: "@CMAKE_CURRENT_SOURCE_DIR@/policies"
 
 default_policy: gazelle2
 
-is_initiale_posture_rl: true
+is_initial_posture_rl: true
 
 high_kp:
   RCY: 5400
