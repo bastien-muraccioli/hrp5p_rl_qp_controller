@@ -160,11 +160,11 @@ void BaseAngVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
       context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  sensorName_ = readParameter<std::string>(parameters, "sensor", std::string("Accelerometer"));
+  bodyName_ = readParameter<std::string>(parameters, "sensor", std::string("Body"));
 
-  if(!context.observationRobot.hasBodySensor(sensorName_))
+  if(!context.observationRobot.hasBody(bodyName_))
   {
-    mc_rtc::log::error_and_throw("[Observation:{}] Body sensor '{}' does not exist on robot '{}'", name(), sensorName_,
+    mc_rtc::log::error_and_throw("[Observation:{}] Body sensor '{}' does not exist on robot '{}'", name(), bodyName_,
                                  context.observationRobot.name());
   }
 
@@ -173,8 +173,8 @@ void BaseAngVelObservation::configure(const ObservationContext & context)
 
 void BaseAngVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  const auto & imu = context.observationRobot.bodySensor(sensorName_);
-  const Eigen::Vector3d value = imu.angularVelocity();
+  const auto & bodyVel = context.observationRobot.mbc().bodyVelB[context.observationRobot.mb().bodyIndexByName("Body")];
+  const Eigen::Vector3d value = bodyVel.angular();
   out = value.cwiseProduct(scale_);
 }
 
@@ -192,11 +192,11 @@ void BaseLinVelObservation::configure(const ObservationContext & context)
   mc_rtc::Configuration parameters =
       context.convention.resolveObservationParameters(requestedType(), type(), config_.parameters);
 
-  sensorName_ = readParameter<std::string>(parameters, "sensor", std::string("Accelerometer"));
+  bodyName_ = readParameter<std::string>(parameters, "sensor", std::string("Body"));
 
-  if(!context.observationRobot.hasBodySensor(sensorName_))
+  if(!context.observationRobot.hasBody(bodyName_))
   {
-    mc_rtc::log::error_and_throw("[Observation:{}] Body sensor '{}' does not exist on robot '{}'", name(), sensorName_,
+    mc_rtc::log::error_and_throw("[Observation:{}] Body sensor '{}' does not exist on robot '{}'", name(), bodyName_,
                                  context.observationRobot.name());
   }
 
@@ -205,8 +205,8 @@ void BaseLinVelObservation::configure(const ObservationContext & context)
 
 void BaseLinVelObservation::compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const
 {
-  const auto & imu = context.observationRobot.bodySensor(sensorName_);
-  const Eigen::Vector3d value = imu.linearVelocity();
+  const auto & bodyVel = context.observationRobot.mbc().bodyVelB[context.observationRobot.mb().bodyIndexByName("Body")];
+  const Eigen::Vector3d value = bodyVel.linear();
   out = value.cwiseProduct(scale_);
 }
 

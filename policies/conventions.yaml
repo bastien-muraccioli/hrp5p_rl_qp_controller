@@ -140,7 +140,7 @@ conventions:
 
       joint_pos_rel:
         joints: all
-        relative_to_default_pose: false
+        relative_to_default_pose: true
         scale: 1.0
 
       joint_vel_rel:

@@ -84,7 +84,7 @@ public:
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
 
 private:
-  std::string sensorName_ = "Accelerometer";
+  std::string bodyName_ = "Body";
   Eigen::VectorXd scale_;
 };
 
@@ -102,7 +102,7 @@ public:
   void compute(const ObservationContext & context, Eigen::Ref<Eigen::VectorXd> out) const override;
 
 private:
-  std::string sensorName_ = "Accelerometer";
+  std::string bodyName_ = "Body";
   Eigen::VectorXd scale_;
 };
 

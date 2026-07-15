@@ -61,6 +61,11 @@ void RLPolicyRuntime::reset(HRP5pRLQPController & ctl)
 
 void RLPolicyRuntime::runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt)
 {
+  mc_rtc::log::warning("Observation: {}", currentObservation_);
+  mc_rtc::log::warning("Raw action: {}", currentAction_);
+  mc_rtc::log::warning("Scaled action: {}", currentActionScaled_);
+  mc_rtc::log::warning("q_zero: {}", q_zero_);
+  mc_rtc::log::warning("q_rl: {}", q_rl_);
   if(!policyLoaded())
   {
     mc_rtc::log::error("[RLPolicyRuntime] Cannot run policy: no ONNX policy loaded");
@@ -264,7 +269,7 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   kdBase_.setZero();
 
   kpBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kp.data(), policy.kp.size());
-  kdBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kd.data(), policy.kp.size());
+  kdBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kd.data(), policy.kd.size());
 
   kp_ = policy.kpScale * kpBase_;
   kd_ = policy.kdScale * kdBase_;
