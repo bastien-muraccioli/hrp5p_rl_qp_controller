@@ -42,7 +42,8 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
     entries_.push_back(entry);
   }
 
-  entry.newest_first = observationsConfig("history_order_newest_first", true);
+  newest_first_ = observationsConfig("history_order_newest_first", true);
+  mc_rtc::log::warning("NEWEST TEST {}", newest_first_);
 
   if(entries_.empty())
     mc_rtc::log::error_and_throw("[ObservationManager] observations.yaml defines an empty observation list");
@@ -84,7 +85,6 @@ Eigen::VectorXd ObservationManager::compute(const ObservationContext & context)
   for(size_t i = 0; i < entries_.size(); ++i)
   {
     Entry & entry = entries_[i];
-    // mc_rtc::log::warning("[ENtry] {} size {}", entry.observation->type(), entry.observation->size());
 
     Eigen::VectorXd current = Eigen::VectorXd::Zero(entry.observation->size());
     entry.observation->compute(context, current);
@@ -144,7 +144,7 @@ Eigen::VectorXd ObservationManager::flattenHistory(const Entry & entry) const
   }
 
   Eigen::VectorXd out = Eigen::VectorXd::Zero(total);
-  if(entry.newest_first)
+  if(newest_first_)
   {
     Eigen::Index offset = 0;
     for(const auto & v : entry.historyBuffer)

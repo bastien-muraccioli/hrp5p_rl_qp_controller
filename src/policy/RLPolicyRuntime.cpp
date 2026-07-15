@@ -244,7 +244,7 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
                                        const std::shared_ptr<mc_tasks::TorqueJointTask> & torqueTask)
 {
   useQP_ = policy.useQP;
-  isTorqueControl_ = policy.isTorqueControl;
+  isTorqueControl_ = false;
   policyStepSize_ = policy.policyStepSize;
   pdGainsRatio_ = policy.kpScale;
 
@@ -440,6 +440,36 @@ mc_rbdyn::Robot & RLPolicyRuntime::selectedObservationRobot(HRP5pRLQPController 
 {
   if(observationSource_ == "robot") return ctl.robot();
   return ctl.realRobot(robotName_);
+}
+
+void RLPolicyRuntime::addLogObs(HRP5pRLQPController & ctl)
+{
+  for(const auto & entry : observationManager_.entries())
+  {
+    std::string name = "HRP5pRLQPController_Observations_" + entry.observation->name();
+    mc_rtc::log::warning(name);
+    int size = entry.historyBuffer.size();
+    if(size == 1)
+      ctl.logger().addLogEntry(name, [entry]() { return entry.historyBuffer[0]; });
+    else
+    {
+      std::string name_t = name + "_t";
+      if(observationManager_.newest_first())
+      {
+        ctl.logger().addLogEntry(name_t, [entry]() { return entry.historyBuffer[0]; });
+        for(size_t i = 1; i < size; i++)
+          ctl.logger().addLogEntry(name_t + "-" + std::to_string(i), [entry, i]() { return entry.historyBuffer[i]; });
+      }
+      else
+      {
+        mc_rtc::log::error(name_t);
+        ctl.logger().addLogEntry(name_t, [entry, size]() { return entry.historyBuffer[size - 1]; });
+        for(size_t i = 1; i < entry.historyBuffer.size(); i++)
+          ctl.logger().addLogEntry(name_t + "-" + std::to_string(i),
+                                   [entry, size, i]() { return entry.historyBuffer[size - 1 - i]; });
+      }
+    }
+  }
 }
 
 } // namespace rlqp

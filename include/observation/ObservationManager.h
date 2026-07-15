@@ -52,15 +52,23 @@ public:
     return convention_.name;
   };
 
-private:
   /** @brief Keeps track of an Observation's history (ex: [joint_pos[t], joint_pos[t-1], joint_pose[t-2]]) */
   struct Entry
   {
     std::shared_ptr<Observation> observation;
     std::deque<Eigen::VectorXd> historyBuffer;
-    bool newest_first = true;
   };
 
+  std::vector<Entry> entries()
+  {
+    return entries_;
+  };
+  bool newest_first()
+  {
+    return newest_first_;
+  };
+
+private:
   /** @brief parse observations.yaml. Handles entries history here and leave observation-specific to respective
    * Observation class */
   ObservationConfig parseObservationConfig(const mc_rtc::Configuration & config) const;
@@ -69,6 +77,7 @@ private:
   std::vector<Entry> entries_;
   ObservationConvention convention_;
   int size_ = 0;
+  bool newest_first_ = true;
 };
 
 } // namespace rlqp

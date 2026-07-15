@@ -116,7 +116,6 @@ action:
 
 control:
   use_QP: true
-  use_torque_control: true
   command_speed: 0.3
   kp_scale: 1.0
   kd_scale: 1.0

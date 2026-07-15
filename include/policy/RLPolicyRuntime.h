@@ -209,6 +209,9 @@ public:
   void activateContactConstraints(bool activate);
   void activateTorqueControl(bool activate);
 
+  /** @brief Add the log entry corresponding to the actual entries_ */
+  void addLogObs(HRP5pRLQPController & ctl);
+
 private:
   void loadPolicy(const std::string & policyName,
                   HRP5pRLQPController & ctl,

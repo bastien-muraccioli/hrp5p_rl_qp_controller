@@ -22,7 +22,6 @@ struct PolicyConfig
   std::string observationsYamlPath;
 
   bool useQP = true;
-  bool isTorqueControl = true;
   double policyStepSize = 0.02;
   double kpScale = 1.0;
   double kdScale = 1.0;

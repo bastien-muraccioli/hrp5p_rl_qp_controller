@@ -149,7 +149,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     const mc_rtc::Configuration control = out.policyConfiguration("control");
 
     out.useQP = control("use_QP", out.policyConfiguration("use_QP", true));
-    out.isTorqueControl = control("use_torque_control", out.policyConfiguration("use_torque_control", true));
     out.policyStepSize = control("policy_step_size", out.policyConfiguration("policy_step_size", 0.02));
     out.kpScale = control("kp_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
     out.kdScale = control("kd_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
@@ -175,9 +174,9 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     else
       out.actionScale = std::vector<double>(joint_size, action("scale", 1.0));
     defaultPos_map = action("q0", std::map<std::string, double>());
-    out.defaultPosition = std::vector<double>(defaultPos_map.size());
     if(!defaultPos_map.empty() && defaultPos_map.size() != joint_size)
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml : default pos should contain all joints if specified");
+    out.defaultPosition = std::vector<double>(defaultPos_map.size());
   }
   else
     mc_rtc::log::error_and_throw("[PolicyConfig]: policy.yaml should contain a \"action\" entry");

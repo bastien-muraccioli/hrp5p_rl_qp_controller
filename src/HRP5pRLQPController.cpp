@@ -121,7 +121,7 @@ void HRP5pRLQPController::initializeRobotBasics(const mc_rtc::Configuration & co
     highKpBase[static_cast<Eigen::Index>(i)] = highKp_map.at(joint_name);
     highKdBase[static_cast<Eigen::Index>(i)] = highKd_map.at(joint_name);
 
-    if (const auto& t = default_posture[robot().jointIndexByName(joint_name)]; !t.empty())
+    if(const auto & t = default_posture[robot().jointIndexByName(joint_name)]; !t.empty())
       defaultPostureTarget[joint_name] = t;
 
     i++;
@@ -179,6 +179,8 @@ void HRP5pRLQPController::addLog()
   // Log current policy (name and convention)
   logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { return rlRuntime_.currentPolicyName(); });
   logger().addLogEntry("HRP5pRLQPController_observationConvention", [this]() { return rlRuntime_.conventionName(); });
+
+  rlRuntime().addLogObs(*this);
 }
 
 void HRP5pRLQPController::addGui()
