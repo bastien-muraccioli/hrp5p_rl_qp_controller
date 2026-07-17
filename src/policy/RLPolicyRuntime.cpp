@@ -327,6 +327,15 @@ void RLPolicyRuntime::configureAction(const PolicyConfig & policy, HRP5pRLQPCont
   actionScale_.setOnes();
   currentActionScaled_.setZero();
 
+  if(policy.actionScale.size() != controllerJointOrder_.size())
+  {
+    mc_rtc::log::error_and_throw(
+        "[RLPolicyRuntime:{}] action scale has size {}, but controller order contains {} joints", policy.name,
+        policy.actionScale.size(), controllerJointOrder_.size());
+  }
+
+  // PolicyConfig stores scales in full controller order, including joints that
+  // are not part of the ONNX action vector (for example gripper joints).
   actionScale_ = Eigen::Map<const Eigen::VectorXd>(policy.actionScale.data(), policy.actionScale.size());
 
   if(!policy.defaultPosition.empty())
