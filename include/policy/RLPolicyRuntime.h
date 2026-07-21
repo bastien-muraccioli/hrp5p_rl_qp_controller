@@ -85,6 +85,26 @@ public:
   {
     return policyStepSize_;
   }
+  double policyRate() const
+  {
+    return 1.0 / policyStepSize_;
+  }
+  size_t policyUpdateCount() const
+  {
+    return policyUpdateCount_;
+  }
+  const std::string & observationSource() const
+  {
+    return observationSource_;
+  }
+  const std::string & baseBody() const
+  {
+    return baseBody_;
+  }
+  size_t controlledActionSize() const
+  {
+    return controlledActionControllerIndices_.size();
+  }
   double phase() const
   {
     return phaseNormalized_;
@@ -285,6 +305,7 @@ private:
 
   double policyStepSize_ = 0.02;
   double policyTimer_ = 0.0;
+  size_t policyUpdateCount_ = 0;
 
   double phasePeriod_ = 1.0;
   double phaseElapsedTime_ = 0.0;

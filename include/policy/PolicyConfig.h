@@ -22,9 +22,10 @@ struct PolicyConfig
   std::string observationsYamlPath;
 
   bool useQP = true;
+  /** Policy inference period in seconds. Configured through control.period_s or control.frequency_hz. */
   double policyStepSize = 0.02;
-  double kpScale = 1.0;
-  double kdScale = 1.0;
+  /** Runtime gain ratio: Kp = ratio * kp_base, Kd = sqrt(ratio) * kd_base. */
+  double pdGainsRatio = 1.0;
 
   /** @brief Joint-group selector from policy.yaml/action/joints. This describes the ONNX action vector layout/size. */
   std::string actionJointGroup;

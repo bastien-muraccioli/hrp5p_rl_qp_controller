@@ -60,8 +60,7 @@ default_policy_index: 0
 
 policies:
   - use_QP: true
-    policy_step_size: 0.02      # Policy runs at 50 Hz
-    physics_step_size: 0.0025   # Controller runs at 400 Hz
+    frequency_hz: 50.0         # Alternatively: period_s: 0.02
     pd_gains_ratio: 1.0
 
     # Per-joint action scale: typically effort_limit / Kp
@@ -125,7 +124,7 @@ Once the policy runs correctly without QP, enable it for safe deployment.
 ## Control flow summary
 
 ```
-Every controller timestep (physics_step_size):
+Every controller timestep:
 ├── If syncTime >= policyStepSize:
 │   ├── observation = getCurrentObservation()
 │   ├── action      = rlPolicy->predict(observation)

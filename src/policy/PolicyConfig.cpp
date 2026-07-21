@@ -149,13 +149,26 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
     const mc_rtc::Configuration control = out.policyConfiguration("control");
 
     out.useQP = control("use_QP", out.policyConfiguration("use_QP", true));
-    out.policyStepSize = control("policy_step_size", out.policyConfiguration("policy_step_size", 0.02));
-    out.kpScale = control("kp_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
-    out.kdScale = control("kd_scale", out.policyConfiguration("pd_gains_ratio", 1.0));
+
+    const bool hasPeriod = control.has("period_s");
+    const bool hasFrequency = control.has("frequency_hz");
+    if(hasPeriod && hasFrequency)
+      mc_rtc::log::error_and_throw("[PolicyConfig:{}] Specify only one of control.period_s or control.frequency_hz",
+                                   out.name);
+
+    if(hasPeriod)
+      out.policyStepSize = control("period_s", 0.02);
+    else if(hasFrequency)
+    {
+      const double frequency = control("frequency_hz", 50.0);
+      if(frequency <= 0.0)
+        mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.frequency_hz must be positive", out.name);
+      out.policyStepSize = 1.0 / frequency;
+    }
+    out.pdGainsRatio = control("pd_gains_ratio", 1.0);
 
     kp_map = control("kp", std::map<std::string, double>());
     kd_map = control("kd", std::map<std::string, double>());
-    mc_rtc::log::warning("JOINTS SIZE {} {}", kp_map.size(), mcRtcJoints.size());
     if(kp_map.size() < joint_size || kd_map.size() < mcRtcJoints.size())
       mc_rtc::log::error_and_throw("[PolicyConfig] policy.yaml: kp and kd must contain all joints");
   }
@@ -195,8 +208,6 @@ PolicyConfig PolicyConfig::load(const std::string & policyFolder, std::vector<st
 
   if(out.controlledJointGroup.empty()) out.controlledJointGroup = out.actionJointGroup;
 
-  mc_rtc::log::warning("TEST {} {}", actionScale_map.size(), out.actionScale.size());
-  mc_rtc::log::error(out.actionScale);
   out.validate();
   return out;
 }
@@ -211,12 +222,10 @@ void PolicyConfig::validate() const
 
   if(actionJointGroup.empty()) mc_rtc::log::error_and_throw("[PolicyConfig:{}] action.joints cannot be empty", name);
 
-  if(policyStepSize <= 0.0)
-    mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.policy_step_size must be positive", name);
+  if(policyStepSize <= 0.0) mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.period_s must be positive", name);
 
-  if(kpScale <= 0.0) mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.kp_scale must be positive", name);
-
-  if(kdScale <= 0.0) mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.kd_scale must be positive", name);
+  if(pdGainsRatio <= 0.0)
+    mc_rtc::log::error_and_throw("[PolicyConfig:{}] control.pd_gains_ratio must be positive", name);
 }
 
 //============================================================================//

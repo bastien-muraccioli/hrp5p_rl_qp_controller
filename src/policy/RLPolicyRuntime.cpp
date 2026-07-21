@@ -61,11 +61,6 @@ void RLPolicyRuntime::reset(HRP5pRLQPController & ctl)
 
 void RLPolicyRuntime::runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt)
 {
-  mc_rtc::log::warning("Observation: {}", currentObservation_);
-  mc_rtc::log::warning("Raw action: {}", currentAction_);
-  mc_rtc::log::warning("Scaled action: {}", currentActionScaled_);
-  mc_rtc::log::warning("q_zero: {}", q_zero_);
-  mc_rtc::log::warning("q_rl: {}", q_rl_);
   if(!policyLoaded())
   {
     mc_rtc::log::error("[RLPolicyRuntime] Cannot run policy: no ONNX policy loaded");
@@ -90,7 +85,7 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt
         currentObservation_.size(), policy_->getObservationSize());
 
   currentAction_ = policy_->predict(currentObservation_);
-  // mc_rtc::log::warning("TEST {}", currentAction_);
+  ++policyUpdateCount_;
 
   if(currentAction_.size() != static_cast<int>(actionToControllerMap_.size()))
     mc_rtc::log::error_and_throw(
@@ -112,7 +107,7 @@ void RLPolicyRuntime::runPolicyStepIfNeeded(HRP5pRLQPController & ctl, double dt
     }
   }
 
-  policyTimer_ = 0.0;
+  policyTimer_ = std::fmod(policyTimer_, policyStepSize_);
 }
 
 void RLPolicyRuntime::reloadCurrentPolicy(HRP5pRLQPController & ctl,
@@ -162,7 +157,7 @@ void RLPolicyRuntime::setPDGainsRatio(double ratio, const std::shared_ptr<mc_tas
 {
   pdGainsRatio_ = ratio;
   kp_ = pdGainsRatio_ * kpBase_;
-  kd_ = pdGainsRatio_ * kdBase_;
+  kd_ = sqrt(pdGainsRatio_) * kdBase_;
 
   if(torqueTask)
   {
@@ -239,9 +234,12 @@ void RLPolicyRuntime::loadPolicy(const std::string & policyName,
   validateObservationAgainstNetwork();
 
   policyTimer_ = policyStepSize_;
+  policyUpdateCount_ = 0;
 
-  mc_rtc::log::success("[RLPolicyRuntime] Policy '{}' loaded. Observation size: {}, action size: {}", policy.name,
-                       currentObservation_.size(), currentAction_.size());
+  mc_rtc::log::success(
+      "[RLPolicyRuntime] Policy '{}' loaded: observation={}, action={}, controlled={}, period={:.6f} s ({:.1f} Hz)",
+      policy.name, currentObservation_.size(), currentAction_.size(), controlledActionControllerIndices_.size(),
+      policyStepSize_, 1.0 / policyStepSize_);
 }
 
 void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
@@ -251,7 +249,15 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   useQP_ = policy.useQP;
   isTorqueControl_ = false;
   policyStepSize_ = policy.policyStepSize;
-  pdGainsRatio_ = policy.kpScale;
+  pdGainsRatio_ = policy.pdGainsRatio;
+
+  if(policyStepSize_ + 1e-8 < ctl.timeStep)
+  {
+    mc_rtc::log::warning(
+        "[RLPolicyRuntime:{}] Policy period ({:.3f} ms) is shorter than the controller step ({:.3f} ms); "
+        "the requested policy rate cannot be reached.",
+        policy.name, 1000.0 * policyStepSize_, 1000.0 * ctl.timeStep);
+  }
 
   phasePeriod_ = policy.observationsConfiguration("phase_period", 1.0);
 
@@ -271,8 +277,8 @@ void RLPolicyRuntime::configureControl(const PolicyConfig & policy,
   kpBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kp.data(), policy.kp.size());
   kdBase_ = Eigen::Map<const Eigen::VectorXd>(policy.kd.data(), policy.kd.size());
 
-  kp_ = policy.kpScale * kpBase_;
-  kd_ = policy.kdScale * kdBase_;
+  kp_ = pdGainsRatio_ * kpBase_;
+  kd_ = sqrt(pdGainsRatio_) * kdBase_;
 
   if(torqueTask)
   {
@@ -461,7 +467,6 @@ void RLPolicyRuntime::addLogObs(HRP5pRLQPController & ctl)
   for(const auto & entry : observationManager_.entries())
   {
     std::string name = "HRP5pRLQPController_Observations_" + entry.observation->name();
-    mc_rtc::log::warning(name);
     int size = entry.historyBuffer.size();
     if(size == 1)
       ctl.logger().addLogEntry(name, [entry]() { return entry.historyBuffer[0]; });
@@ -476,7 +481,6 @@ void RLPolicyRuntime::addLogObs(HRP5pRLQPController & ctl)
       }
       else
       {
-        mc_rtc::log::error(name_t);
         ctl.logger().addLogEntry(name_t, [entry, size]() { return entry.historyBuffer[size - 1]; });
         for(size_t i = 1; i < entry.historyBuffer.size(); i++)
           ctl.logger().addLogEntry(name_t + "-" + std::to_string(i),

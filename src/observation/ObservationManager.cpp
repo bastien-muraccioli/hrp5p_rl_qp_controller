@@ -43,7 +43,6 @@ void ObservationManager::load(const mc_rtc::Configuration & observationsConfig,
   }
 
   newest_first_ = observationsConfig("history_order_newest_first", true);
-  mc_rtc::log::warning("NEWEST TEST {}", newest_first_);
 
   if(entries_.empty())
     mc_rtc::log::error_and_throw("[ObservationManager] observations.yaml defines an empty observation list");

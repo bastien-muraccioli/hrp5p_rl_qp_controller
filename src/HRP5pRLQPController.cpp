@@ -172,9 +172,15 @@ void HRP5pRLQPController::addLog()
                        [this]() { return rlRuntime_.currentActionScaled(); });
   logger().addLogEntry("HRP5pRLQPController_RL_actionScale", [this]() { return rlRuntime_.actionScale(); });
   logger().addLogEntry("HRP5pRLQPController_RL_command", [this]() { return rlRuntime_.command(); });
+  logger().addLogEntry("HRP5pRLQPController_RL_phase", [this]() { return rlRuntime_.phase(); });
+  logger().addLogEntry("HRP5pRLQPController_RL_policy_period_s", [this]() { return rlRuntime_.policyStepSize(); });
+  logger().addLogEntry("HRP5pRLQPController_RL_update_count", [this]() { return rlRuntime_.policyUpdateCount(); });
 
   // Controller state variables
   logger().addLogEntry("HRP5pRLQPController_useQP", [this]() { return rlRuntime_.useQP(); });
+  logger().addLogEntry("HRP5pRLQPController_torqueControl", [this]() { return rlRuntime_.isTorqueControl(); });
+  logger().addLogEntry("HRP5pRLQPController_contactConstraints",
+                       [this]() { return rlRuntime_.contactConstraintsAreEnabled(); });
 
   // Log current policy (name and convention)
   logger().addLogEntry("HRP5pRLQPController_currentPolicy", [this]() { return rlRuntime_.currentPolicyName(); });
@@ -190,6 +196,11 @@ void HRP5pRLQPController::addGui()
       mc_rtc::gui::Label("Current policy", [this]() { return rlRuntime_.currentPolicyName(); }),
       mc_rtc::gui::Label("Current policy folder", [this]() { return rlRuntime_.currentPolicyFolder(); }),
       mc_rtc::gui::Label("Observation convention", [this]() { return rlRuntime_.conventionName(); }),
+      mc_rtc::gui::Label("Observation source", [this]() { return rlRuntime_.observationSource(); }),
+      mc_rtc::gui::Label("Base body", [this]() { return rlRuntime_.baseBody(); }),
+      mc_rtc::gui::Label("Observation size", [this]() { return rlRuntime_.observationSize(); }),
+      mc_rtc::gui::Label("Action size", [this]() { return rlRuntime_.actionSize(); }),
+      mc_rtc::gui::Label("Controlled action size", [this]() { return rlRuntime_.controlledActionSize(); }),
       mc_rtc::gui::ComboInput(
           "Select policy", rlRuntime_.availablePolicyNames(), [this]() { return rlRuntime_.currentPolicyName(); },
           [this](const std::string & policyName) { rlRuntime_.loadPolicyByName(policyName, *this, torqueJointTask); }),
@@ -209,6 +220,14 @@ void HRP5pRLQPController::addGui()
       mc_rtc::gui::Label("QP Control", [this]() { return rlRuntime_.useQP() ? "Enforced" : "Bypassed"; }),
       mc_rtc::gui::Button("Toggle print joint limits", [this]() { printLimits_ = !printLimits_; }),
       mc_rtc::gui::Label("Print joint limits", [this]() { return printLimits_ ? "Enabled" : "Disabled"; }));
+
+  gui()->addElement({"HRP5pRLQPController", "Runtime"},
+                    mc_rtc::gui::Label("Controller period [s]", [this]() { return timeStep; }),
+                    mc_rtc::gui::Label("Controller rate [Hz]", [this]() { return 1.0 / timeStep; }),
+                    mc_rtc::gui::Label("Policy period [s]", [this]() { return rlRuntime_.policyStepSize(); }),
+                    mc_rtc::gui::Label("Policy rate [Hz]", [this]() { return rlRuntime_.policyRate(); }),
+                    mc_rtc::gui::Label("Policy updates", [this]() { return rlRuntime_.policyUpdateCount(); }),
+                    mc_rtc::gui::Label("Phase", [this]() { return rlRuntime_.phase(); }));
 
   gui()->addElement(
       {"HRP5pRLQPController", "Command"},
