@@ -1,6 +1,6 @@
-name: gazelle2
+name: walk2
 
-onnx: gazelle2.onnx
+onnx: walk2.onnx
 
 action:
   joints: all_no_grippers
@@ -44,6 +44,7 @@ action:
     LEP: 0.6923783092178423
     LWRR: 1.0253104749507966
     LWRP: 0.4101241899803186
+
   q0:
     # Right Leg
     RCY: 0.0

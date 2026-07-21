@@ -1,0 +1,41 @@
+training_convention: mjlab
+
+history_order_newest_first: false
+
+observations:
+  - type: base_lin_vel
+    parameters:
+      history: 5
+
+  - type: base_ang_vel
+    parameters:
+      history: 5
+
+  - type: projected_gravity
+    parameters:
+      history: 5
+      body: Body
+
+  - type: joint_pos_rel
+    parameters:
+      history: 5
+      joints: all_no_grippers
+
+  - type: joint_vel_rel
+    parameters:
+      history: 5
+      joints: all_no_grippers
+
+  - type: log_force_sensor
+    parameters:
+      history: 5
+      sensor_names: ["LeftFootForceSensor", "RightFootForceSensor"]
+
+  - type: last_action
+    parameters:
+      joints: all_no_grippers
+      history: 5
+
+  - type: generated_commands
+    parameters:
+      history: 5

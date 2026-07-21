@@ -72,7 +72,7 @@ init: HRP5pRLQPController_Initial
 
 policies_root: "@CMAKE_CURRENT_SOURCE_DIR@/policies"
 
-default_policy: gazelle2
+default_policy: walk2
 
 is_initial_posture_rl: true
 
