@@ -1,9 +1,16 @@
-mc_rtc new RL-QP controller template
-==
+<p align="center">
+  <a>
+    <img src="ext/image/logo.png" alt="logo" width="300">
+  </a>
+</p>
 
-This project is a template for a new RL-QP controller project wihtin [mc_rtc].
+---
 
-The goal of this template is to help users deploy reinforcement learning (RL) policies within a Quadratic Programming (QP) framework augmented with Control Barrier Functions (CBFs). This combination is enforcing physical and safety constraints, including:
+# mc_rtc RL-QP Controller for HRP5P
+
+This repository provides an adaptation of the **mc_rtc RL-QP Controller Template** for the **HRP5P** humanoid robot.
+
+The goal of this repository is to help users deploy reinforcement learning (RL) policies within a Quadratic Programming (QP) framework augmented with Control Barrier Functions (CBFs). This combination enforces physical and safety constraints, including:
 
 * Joint position limits
 * Joint velocity limits
@@ -12,129 +19,109 @@ The goal of this template is to help users deploy reinforcement learning (RL) po
 
 Further details are available in:
 
-[*Safe Execution of RL Policies via Acceleration-based CBF-QP Constraint Enforcement for Real-World Robotic Deployments*](https://hal.science/hal-05362571)
-
+> *Safe Execution of RL Policies via Acceleration-based CBF-QP Constraint Enforcement for Real-World Robotic Deployments*
+> https://hal.science/hal-05362571
 
 It comes with:
-- a CMake project that can build a controller in [mc_rtc], the project can be put within [mc_rtc] source-tree for easier updates
-- clang-format files
-- automated GitHub Actions builds on three major platforms
 
-Quick start
---
+- a CMake project that can build a controller in [mc_rtc], the project can be put within the [mc_rtc] source tree for easier updates;
+- clang-format files;
+- automated GitHub Actions builds on three major platforms.
 
-1. Renaming the controller from `HRP5pRLQPController` to `MyController`. In a shell (Git Bash on Windows, replace sed with gsed on macOS):
+Currently only ONNX format policies are supported.
+
+## Documentation
+
+The complete documentation, including the controller architecture, observation system, policy configuration, adaptation guide and API reference, is available at:
+
+**https://alhuuin.github.io/rl-qp-controller.github.io/**
+
+The documentation also includes practical guides for adapting the controller to new robots and examples.
+
+The HRP5P repository follows the architecture described there and extends it with robot-specific startup logic, control-mode management and contact handling.
+
+## Repository-specific features
+
+Compared to the generic template, this repository provides:
+
+- HRP5P robot integration;
+- dedicated Initial and RL states;
+- runtime control-mode management;
+- force-sensor-based contact handling;
+- force-sensor-based external force estimation;
+- HRP5P joint groups and conventions;
+- standing and walking example policies.
+
+## HRP5P-specific implementation
+
+Unlike the template, the HRP5P controller introduces an initial state before entering RL execution.
+
+### Two-state architecture
+
+The Initial state is responsible for:
+
+- position-control startup;
+- posture stabilization;
+- contact initialization;
+- preparing the robot for RL execution.
+
+The RL state then:
+
+- switches to torque control;
+- starts policy inference;
+- updates the torque task targets.
+
+This repository therefore provides a complete example of a controller requiring an explicit transition from initialization to RL.
+
+### Observer pipeline
+
+The HRP5P implementation extends the template with several robot-specific observers.
+
+In particular, it provides:
+
+- encoder velocity observations;
+- floating-base estimation with acceleration;
+- force-sensor-based external force estimation.
+
+Unlike the H1 implementation, the external force observer is configured for robots equipped with dedicated force/torque sensors and uses motor torque measurements.
+
+### Contact handling
+
+The HRP5P implementation illustrates a force-sensor-based contact pipeline.
+
+Foot contacts are inferred from the left and right foot force sensors using independent Schmitt triggers before updating the controller contact state.
+
+This repository therefore serves as an example of integrating contact-aware control on robots equipped with force sensors.
+
+### Runtime control modes
+
+Unlike the template, the HRP5P controller explicitly manages runtime control-mode transitions.
+
+It starts in position control during initialization before switching to torque control for RL execution. The controller also adapts the solver feedback model according to the active control mode.
+
+### Policies
+
+The template example policies have been replaced by HRP5P policies.
+
+Policy configuration follows exactly the format described in the documentation.
+
+### Configuration
+
+This implementation introduces several additional configuration parameters for the initial state, including:
+
+- `is_initial_posture_rl` : defines if the posture of the initial state;
+- `high_kp`/`high_kd` : PD gains used in initial state;
+## Building
 
 ```bash
-sed -i -e's/HRP5pRLQPController/MyController/g' `find . -not -path '*/.*' -type f`
-git mv src/HRP5pRLQPController.cpp src/MyController.cpp
-git mv src/HRP5pRLQPController.h src/MyController.h
-git mv src/states/HRP5pRLQPController_Initial.cpp src/states/MyController_Initial.cpp
-git mv src/states/HRP5pRLQPController_Initial.h src/states/MyController_Initial.h
-git mv etc/HRP5pRLQPController.in.yaml etc/MyController.in.yaml
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build . -j
+sudo cmake --install .
 ```
 
-2. You can customize the project name in vcpkg.json as well, note that this must follow [vcpkg manifest rules](https://github.com/microsoft/vcpkg/blob/master/docs/users/manifests.md)
-
-2. Build and install the project
-
-3. Run using your [mc_rtc] interface of choice, and setting `Enabled` to `MyController`
+After installation, enable `HRP5pRLQPController` in **mc_rtc**.
 
 ---
-
-## Tutorial: Deploying your own RL policy
-
-### Step 1 — Export your policy to ONNX
-
-Place the `.onnx` file somewhere accessible and set `policy_path` in the YAML
-config.
-
-### Step 2 — Fill in the YAML config
-
-Edit `etc/MyController.in.yaml`. Each entry under `policies` corresponds to
-one ONNX file (indexed by `default_policy_index`):
-
-```yaml
-policy_path: ["my_policy.onnx"]
-default_policy_index: 0
-
-policies:
-  - use_QP: true
-    frequency_hz: 50.0         # Alternatively: period_s: 0.02
-    pd_gains_ratio: 1.0
-
-    # Per-joint action scale: typically effort_limit / Kp
-    action_scale:
-      joint_a: 0.88
-      joint_b: 0.57
-      # ...
-
-    # PD gains matching those used during RL training
-    kp:
-      joint_a: 112.6
-      joint_b: 417.2
-      # ...
-    kd:
-      joint_a: 17.9
-      joint_b: 66.4
-      # ...
-
-    # Default/reference pose used during training (radians)
-    # A zero policy output commands this pose
-    q0:
-      joint_a: 0.0
-      joint_b: 0.872   # 50°
-      # ...
-
-    # Order of joints in the policy's action vector
-    ref_joint_order:
-      - "joint_a"
-      - "joint_b"
-      # ...
-```
-
-### Step 3 — Implement the observation
-
-Open `src/utils.cpp` and fill in `getCurrentObservation()` for your policy
-index. The observation must exactly match the training environment.
-
-Then implement `initializeRLObservation()` in `HRP5pRLQPController.cpp` to
-populate index 0 of each buffer from the current robot state.
-
-Example for a policy with history_length=5 can be found in the commented parts of the code.
-
-### Step 4 — Tune CBF parameters
-
-The CBF gains control how aggressively the QP enforces safety constraints.
-Start with the defaults and increase if limits are breached.
-Enable limit monitoring from the GUI ("Toggle print joint limits") to see
-which constraints are being approached.
-
-### Step 5 — Test without QP first
-
-Set `use_QP: false` in the config (or toggle from the GUI) to apply torques
-directly without the QP safety layer. This is useful to:
-- Verify the observation and action pipeline is correct
-- Compare behavior with and without CBF corrections
-
-Once the policy runs correctly without QP, enable it for safe deployment.
-
----
-
-## Control flow summary
-
-```
-Every controller timestep:
-├── If syncTime >= policyStepSize:
-│   ├── observation = getCurrentObservation()
-│   ├── action      = rlPolicy->predict(observation)
-│   ├── q_rl        = action * actionScale + q_zero
-│   └── syncTime    = 0
-│
-├── τ = Kp*(q_rl - q) - Kd*q̇
-│
-├── useQP=true:  τ → TorqueJointTask → CBF-QP → robot
-└── useQP=false: τ → robot (direct)
-```
 
 [mc_rtc]: https://jrl-umi3218.github.io/mc_rtc/
