@@ -12,6 +12,7 @@ void HRP5pRLQPController_TorquePos::start(mc_control::fsm::Controller & ctl_)
   ctl.activateContactConstraints(true);
   ctl.activateExternalTorqueComputation(false);
   ctl.solver().addTask(ctl.torqueJointTask);
+  if(ctl.postureTask->inSolver()) ctl.solver().removeTask(ctl.postureTask);
   ctl.torqueJointTask->setPosTarget(ctl.q_zero);
   ctl.setHighPDGains(true); // Use high PD gains
 }

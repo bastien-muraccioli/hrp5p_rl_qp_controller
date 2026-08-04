@@ -20,9 +20,7 @@ endif()
 
 add_subdirectory(src)
 
-# if(BUILD_TESTING)
-#   add_subdirectory(tests)
-# endif()
+# if(BUILD_TESTING) add_subdirectory(tests) endif()
 
 configure_file(etc/HRP5pRLQPController.in.yaml
                "${CMAKE_CURRENT_BINARY_DIR}/etc/HRP5pRLQPController.yaml")
