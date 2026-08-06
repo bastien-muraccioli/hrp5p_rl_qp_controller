@@ -99,6 +99,8 @@ init: HRP5pRLQPController_Initial
 # init: HRP5pRLQPController_RLWithoutQP
 # init: HRP5pRLQPController_RLPos
 
+Plugins: [mc_joystick_plugin]
+
 # RL policy configuration parameters
 policy_path: ["walk.onnx", "stand.onnx", "walk2.onnx", "gazelle2.onnx"]  # Path to the RL policy file(s)
 default_policy_index: 3 # Index of the default policy to use

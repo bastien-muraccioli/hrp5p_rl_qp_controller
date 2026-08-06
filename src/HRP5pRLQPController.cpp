@@ -12,6 +12,8 @@
 #include <cmath>
 #include <vector>
 
+#include <mc_joystick_plugin/joystick_inputs.h>
+
 #include <mc_tvm/Robot.h>
 
 HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration & config)
@@ -78,6 +80,19 @@ bool HRP5pRLQPController::run()
   //       std::filesystem::path(robot.module().calib_dir) / std::string("calib_data." + ft_sensor.name());
   //   mc_rtc::log::info("[HRP5pRLQPController] FT sensor calib file: {}", calib_file.string());
   // }
+
+  if(datastore().has("Joystick::connected") && datastore().get<bool>("Joystick::connected"))
+  {
+    // mc_rtc::log::info("[HRP5pRLQPController] Joystick connected, using joystick inputs for velocity command");
+    RLuseJoyStickInputs();
+    if(!useJoystick_) useJoystick_ = true;
+  }
+  else
+  {
+    // mc_rtc::log::info("[HRP5pRLQPController] Joystick not connected, using default velocity command");
+    if(useJoystick_) currentVelCmd = Eigen::Vector3d::Zero();
+    useJoystick_ = false;
+  }
 
   if(printLimits_) computeLimits();
 
@@ -779,5 +794,63 @@ void HRP5pRLQPController::activateExternalTorqueComputation(bool activate)
   if(activate != datastore().call<bool>("EF_Estimator::isActive"))
   {
     datastore().call("EF_Estimator::toggleActive");
+  }
+}
+
+void HRP5pRLQPController::RLuseJoyStickInputs()
+{
+  // Get joystick functions
+  auto & stickFunc = datastore().get<std::function<Eigen::Vector2d(joystickAnalogicInputs)>>("Joystick::Stick");
+
+  // Read sticks values
+  leftStick_ = stickFunc(joystickAnalogicInputs::L_STICK);
+  // Apply dead zone
+  double vel_x = 0.0;
+  if(std::abs(leftStick_(0) - 0.5) > joystickDeadZone_)
+  {
+    vel_x = (leftStick_(0) - 0.5) * 2.0 * maxVelCmd_;
+  }
+  double vel_y = 0.0;
+  if(std::abs(leftStick_(1) - 0.5) > joystickDeadZone_)
+  {
+    vel_y = (leftStick_(1) - 0.5) * 2.0 * maxVelCmd_;
+  }
+  currentVelCmd[0] = vel_x;
+  currentVelCmd[1] = vel_y;
+
+  rightStick_ = stickFunc(joystickAnalogicInputs::R_STICK);
+  double yaw_cmd = 0.0;
+  if(std::abs(rightStick_(1) - 0.5) > joystickDeadZone_)
+  {
+    yaw_cmd = (rightStick_(1) - 0.5) * 2.0 * maxYawCmd_;
+  }
+  currentVelCmd[2] = yaw_cmd;
+
+  // Read D-pad buttons
+  directionButtons_ = {datastore().get<bool>("Joystick::UpPad"), datastore().get<bool>("Joystick::DownPad"),
+                       datastore().get<bool>("Joystick::LeftPad"), datastore().get<bool>("Joystick::RightPad")};
+
+  for(size_t i = 0; i < directionButtons_.size(); ++i)
+  {
+    if(directionButtons_[i])
+    {
+      switch(i)
+      {
+        case 0: // Up
+          currentVelCmd[0] += 1.0 * maxVelCmd_;
+          break;
+        case 1: // Down
+          currentVelCmd[0] -= 1.0 * maxVelCmd_;
+          break;
+        case 2: // Left
+          currentVelCmd[1] += 1.0 * maxVelCmd_;
+          break;
+        case 3: // Right
+          currentVelCmd[1] -= 1.0 * maxVelCmd_;
+          break;
+        default:
+          break;
+      }
+    }
   }
 }

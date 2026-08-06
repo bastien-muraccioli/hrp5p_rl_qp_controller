@@ -79,6 +79,7 @@ private:
   void addLog();
   // Add GUI elements to the mc_rtc GUI through Rviz and mc_mujoco
   void addGui();
+  void RLuseJoyStickInputs();
 
   void initializeRobot();
   void configRL();
@@ -148,4 +149,13 @@ private:
   double lv = 20.0; // Velocity gain for low pass filter on the real robot joint velocity
 
   bool useRealRobotStateForRLObservation_ = true;
+
+  // Joystick input handling
+  std::vector<bool> directionButtons_ = std::vector<bool>(4, false); // Up, Down, Left, Right
+  double joystickDeadZone_ = 0.02; // Dead zone for joystick inputs
+  Eigen::Vector2d leftStick_ = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
+  Eigen::Vector2d rightStick_ = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
+  double maxVelCmd_ = 0.3;
+  double maxYawCmd_ = 0.5;
+  bool useJoystick_ = false;
 };
