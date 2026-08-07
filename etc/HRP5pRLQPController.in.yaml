@@ -95,9 +95,9 @@ transitions:
   - [HRP5pRLQPController_RLWithoutQP, OK, HRP5pRLQPController_Initial, Strict]
 
 # Initial state
-init: HRP5pRLQPController_Initial
+# init: HRP5pRLQPController_Initial
 # init: HRP5pRLQPController_RLWithoutQP
-# init: HRP5pRLQPController_RLPos
+init: HRP5pRLQPController_RLPos
 
 Plugins: [mc_joystick_plugin]
 

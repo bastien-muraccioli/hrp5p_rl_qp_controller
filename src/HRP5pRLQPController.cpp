@@ -223,6 +223,11 @@ void HRP5pRLQPController::initializeRLPolicy()
     jointAction[i] = jointAction[0];
     footContactForces[i] = footContactForces[0];
   }
+
+  // Run a first inference to reduce memory footprint
+  auto & ctl = static_cast<HRP5pRLQPController &>(*this);
+  utilsClass.start_rl_state(ctl, "RL_State");
+  ctl.utilsClass.run_rl_state(ctl);
 }
 
 void HRP5pRLQPController::initializeRLObservation()
