@@ -4,6 +4,7 @@
 #include <mc_rtc/gui/Checkbox.h>
 #include <mc_rtc/gui/Force.h>
 #include <mc_rtc/gui/Input.h>
+#include <mc_rtc/gui/NumberSlider.h>
 #include <mc_rtc/gui/Transform.h>
 
 #include <RBDyn/MultiBodyConfig.h>
@@ -80,6 +81,24 @@ bool HRP5pRLQPController::run()
   //       std::filesystem::path(robot.module().calib_dir) / std::string("calib_data." + ft_sensor.name());
   //   mc_rtc::log::info("[HRP5pRLQPController] FT sensor calib file: {}", calib_file.string());
   // }
+
+  // Check if bodysensor "FloatingBase" exists
+  if(robot.hasBodySensor("FloatingBase"))
+  {
+    const auto & bodySensor = robot.bodySensor("FloatingBase");
+    const auto & bodySensorLinearVelocity = bodySensor.linearVelocity();
+    const auto & bodySensorAngularVelocity = bodySensor.angularVelocity();
+
+    // Convert to Body frame
+    Eigen::Vector3d bodySensorLinearVelocityInBodyFrame = robot.bodyPosW("Body").rotation() * bodySensorLinearVelocity;
+    Eigen::Vector3d bodySensorAngularVelocityInBodyFrame =
+        robot.bodyPosW("Body").rotation() * bodySensorAngularVelocity;
+
+    // x, y and yaw velocity in body frame
+    localVelocity_ = Eigen::Vector3d(bodySensorLinearVelocityInBodyFrame.x(), bodySensorLinearVelocityInBodyFrame.y(),
+                                     bodySensorAngularVelocityInBodyFrame.z());
+    velocityError_ = localVelocity_ - currentVelCmd;
+  }
 
   if(datastore().has("Joystick::connected") && datastore().get<bool>("Joystick::connected"))
   {
@@ -162,6 +181,11 @@ void HRP5pRLQPController::initializeRobot()
   // tauCoupling = Eigen::VectorXd::Zero(nbActuatedJoints);
   // extraDamping = Eigen::VectorXd::Zero(nbActuatedJoints);
 
+  localVelocity_ = Eigen::Vector3d::Zero();
+  velocityError_ = Eigen::Vector3d::Zero();
+
+  tauOut_ = robot().mbc().jointTorque;
+
   // Get the gains from the configuration or set default values
   pdGainsRatio_ = config_("policies")[currentPolicyIndex]("pd_gains_ratio", 1.0);
   std::map<std::string, double> actionScale_map = config_("policies")[currentPolicyIndex]("action_scale");
@@ -186,8 +210,6 @@ void HRP5pRLQPController::initializeRobot()
     kdBase_[i] = kd_map.at(joint_name);
     highKpBase_[i] = highKp_map.at(joint_name);
     highKdBase_[i] = highKd_map.at(joint_name);
-    // kdCouple[i] = 1.01 * (highKpBase_[i]*0.5*timeStep); // Damping for the coupling term, tuned to avoid oscillations
-    // in the coupling port
     q_zero[i] = q0_map_.at(joint_name);
     defaultPostureTarget[joint_name] = {q_zero[i]};
     updateIfExists(actionScale[i], actionScale_map, joint_name);
@@ -412,6 +434,8 @@ void HRP5pRLQPController::addLog()
                        [this]() { return (control_vdotfb_.vector() - real_vdotfb_.vector()).norm(); });
   logger().addLogEntry("HRP5pRLQPController_useRealRobotStateForRLObservation",
                        [this]() { return useRealRobotStateForRLObservation_; });
+  logger().addLogEntry("HRP5pRLQPController_localVelocity", [this]() { return localVelocity_; });
+  logger().addLogEntry("HRP5pRLQPController_velocityError", [this]() { return velocityError_; });
 }
 
 void HRP5pRLQPController::addGui()
@@ -477,14 +501,16 @@ void HRP5pRLQPController::addGui()
                          [this]() { return contactConstraintsAreEnabled_ ? "Enabled" : "Disabled"; }),
       mc_rtc::gui::Button("Toggle print joint limits", [this]() { printLimits_ = !printLimits_; }),
       mc_rtc::gui::Label("Print joint limits", [this]() { return printLimits_ ? "Enabled" : "Disabled"; }),
-      mc_rtc::gui::Input("nyquist_fraction", nyquistFraction_),
+      mc_rtc::gui::NumberSlider("nyquist_fraction", nyquistFraction_, 0.01, 0.99),
       mc_rtc::gui::Button("Toggle FB filter",
                           [this]() { openLoopRealFBlowPassFilterActive = !openLoopRealFBlowPassFilterActive; }),
       mc_rtc::gui::Label("FB filter", [this]() { return openLoopRealFBlowPassFilterActive ? "Enabled" : "Disabled"; }),
       mc_rtc::gui::Input("lp", lp), mc_rtc::gui::Input("lv", lv));
 
   gui()->addElement({"HRP5pRLQPController", "Velocity Command"},
-                    mc_rtc::gui::ArrayInput("Current Velocity Command", {"vx", "vy", "yaw_rate"}, currentVelCmd));
+                    mc_rtc::gui::ArrayInput("Current Velocity Command", {"vx", "vy", "yaw_rate"}, currentVelCmd),
+                    mc_rtc::gui::ArrayLabel("Local Velocity", {"vx", "vy", "yaw_rate"}, localVelocity_),
+                    mc_rtc::gui::ArrayLabel("Velocity Error", {"vx", "vy", "yaw_rate"}, velocityError_));
 
   auto & robot = realRobot(robots()[0].name());
   for(const auto & ft_sensor : robot.forceSensors())
@@ -695,6 +721,9 @@ void HRP5pRLQPController::computeLimits()
   const auto & tauLimLower = robot.tl();
   const auto & tauLimUpper = robot.tu();
 
+  const auto & tauDLimLower = robot.tdl();
+  const auto & tauDLimUpper = robot.tdu();
+
   for(std::string joint : robot.refJointOrder())
   {
     // Skip joints not present in the multibody chain (e.g. finger joints)
@@ -718,6 +747,9 @@ void HRP5pRLQPController::computeLimits()
     const double velLimitLow = velPercent_ * qDotLimLower[i][0];
     const double tauLimitUp = tauLimUpper[i][0];
     const double tauLimitLow = tauLimLower[i][0];
+    const double tauDLimitUp = tauDLimUpper[i][0];
+    const double tauDLimitLow = tauDLimLower[i][0];
+    const double currentTauD = (currentTau[i][0] - tauOut_[i][0]) / timeStep;
 
     if(currentPos[i][0] > posLimitUp + epsilon)
     {
@@ -749,7 +781,21 @@ void HRP5pRLQPController::computeLimits()
       mc_rtc::log::warning("Joint {} torque lower limit breached: currentTau = {}, limit = {}", joint, currentTau[i][0],
                            tauLimitLow);
     }
+    // if(currentTauD > tauDLimitUp + epsilon)
+    // {
+    //   mc_rtc::log::warning("Joint {} torque derivative upper limit breached: currentTauD = {}, limit = {}", joint,
+    //   currentTauD,
+    //                        tauDLimitUp);
+    // }
+    // if(currentTauD < tauDLimitLow - epsilon)
+    // {
+    //   mc_rtc::log::warning("Joint {} torque derivative lower limit breached: currentTauD = {}, limit = {}", joint,
+    //   currentTauD,
+    //                        tauDLimitLow);
+    // }
   }
+
+  tauOut_ = currentTau;
 }
 
 void HRP5pRLQPController::setHighPDGains(bool high)

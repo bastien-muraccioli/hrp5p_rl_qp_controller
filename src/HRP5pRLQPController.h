@@ -113,9 +113,9 @@ private:
   // CBF Gains More details are explained in the paper cf. Readme.md.
   // Must be tuned depending on the robot.
   double zeta_jointLimit_ = 1.2;
-  double lambda_jointLimit_ = 200.0; // Same gain for joint position limits and velocity limits.
-  double zeta_selfCollision_ = 1.2;
-  double lambda_selfCollision_ = 100.0;
+  double lambda_jointLimit_ = 90.0; // Same gain for joint position limits and velocity limits.
+  double zeta_selfCollision_ = 1.1;
+  double lambda_selfCollision_ = 5.0;
 
   // Gains
   double pdGainsRatio_ = 1.0;
@@ -156,6 +156,12 @@ private:
   Eigen::Vector2d leftStick_ = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
   Eigen::Vector2d rightStick_ = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
   double maxVelCmd_ = 0.3;
+  // double maxVelCmd_ = 1.5;
   double maxYawCmd_ = 0.5;
   bool useJoystick_ = false;
+
+  Eigen::Vector3d localVelocity_; // x, y, yaw rate in the local frame of the robot
+  Eigen::Vector3d
+      velocityError_; // Error between the commanded velocity and the actual velocity in the local frame of the robot
+  std::vector<std::vector<double>> tauOut_; // Use for the derivative torque limit log
 };

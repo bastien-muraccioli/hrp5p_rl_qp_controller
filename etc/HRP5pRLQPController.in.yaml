@@ -45,6 +45,8 @@ ObserverPipelines:
     - type: MCWaiko
       required: true
       update: true
+      leggedOdometry:
+        odometryType: 6D
       filterGains:
         initAlpha: 4
         initRho: 2
@@ -60,7 +62,8 @@ ObserverPipelines:
         contactsDetection: Surfaces
         surfacesForContactDetection: [RightFootCenter, LeftFootCenter]
     # - type: BodySensor
-    #   update: true
+    #   required: true
+    #   update: false
     #   bodySensor: FloatingBase
     #   updateAcc: true
     - type: ExternalForcesObserver
