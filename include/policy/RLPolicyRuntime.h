@@ -123,7 +123,6 @@ public:
   {
     return isTorqueControl_;
   }
-
   const Eigen::VectorXd & q_rl() const
   {
     return q_rl_;
@@ -222,6 +221,10 @@ public:
   const Eigen::Vector3d & command() const
   {
     return command_;
+  }
+  void setCommand(Eigen::Vector3d new_cmd)
+  {
+    command_ = new_cmd;
   }
 
   void setHighPDGains(bool high);

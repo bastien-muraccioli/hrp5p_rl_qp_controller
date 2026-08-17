@@ -81,6 +81,9 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
   bool run() override;
   void reset(const mc_control::ControllerResetData & reset_data) override;
 
+  void RLuseJoyStickInputs();
+  void RLuseKeyboardInputs();
+
   bool manageModeSwitching();
 
   /** @brief Enable or disable the CBF-QP layer at runtime. */
@@ -94,6 +97,15 @@ struct HRP5pRLQPController_DLLAPI HRP5pRLQPController : public mc_control::fsm::
 
   rlqp::RLPolicyRuntime & rlRuntime();
   const rlqp::RLPolicyRuntime & rlRuntime() const;
+
+  void setMaxVelCmd(double new_max_vel_cmd)
+  {
+    maxVelCmd = new_max_vel_cmd;
+  };
+  void setMaxYawCmd(double new_max_yaw_cmd)
+  {
+    maxYawCmd = new_max_yaw_cmd;
+  };
 
   /** @brief Torque-space whole-body task fed into the CBF-QP solver. */
   std::shared_ptr<mc_tasks::TorqueJointTask> torqueJointTask;
@@ -181,4 +193,13 @@ private:
 
   bool prevLeftContact_ = false;
   bool prevRightContact_ = false;
+
+  // --- Velocity Cmd Params ---
+  std::vector<bool> DirectionButtons = std::vector<bool>(4, false); // Up, Down, Left, Right
+  double joystickDeadZone = 0.02; // Dead zone for joystick inputs
+  Eigen::Vector2d leftStick = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
+  Eigen::Vector2d rightStick = Eigen::Vector2d(0.5, 0.5); // x (UP), y (LEFT)
+
+  double maxVelCmd;
+  double maxYawCmd;
 };

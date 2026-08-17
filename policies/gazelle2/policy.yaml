@@ -118,6 +118,9 @@ control:
   use_QP: true
   pd_gains_ratio: 1.0
   period_s: 0.02
+  vel_cmd_speed:
+    xy: 0.3
+    yaw: 0.3
 
   kp:
     # Right Leg
