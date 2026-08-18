@@ -41,9 +41,10 @@ HRP5pRLQPController::HRP5pRLQPController(mc_rbdyn::RobotModulePtr rm, double dt,
 bool HRP5pRLQPController::run()
 {
   // Use joystick plugin if present else jeyboard inputs
-  if(datastore().has("Joystick::connected") && datastore().get<bool>("Joystick::connected"))
+  controllerAvailable = datastore().has("Joystick::connected") && datastore().get<bool>("Joystick::connected");
+  if(controllerAvailable && toggleJoystick)
     RLuseJoyStickInputs();
-  else
+  else if(toggleKeyboard)
     RLuseKeyboardInputs();
 
   if(printLimits_) computeLimits();
@@ -346,7 +347,28 @@ void HRP5pRLQPController::addGui()
                     mc_rtc::gui::Label("Phase", [this]() { return rlRuntime_.phase(); }));
 
   gui()->addElement(
-      {"HRP5pRLQPController", "Command"}, mc_rtc::gui::Label("Command values", []() { return std::string(" "); }),
+      {"HRP5pRLQPController", "Command"},
+      mc_rtc::gui::Button("Toggle Joystick Plugin",
+                          [this]()
+                          {
+                            toggleJoystick = !toggleJoystick;
+                            if(toggleJoystick) toggleKeyboard = false;
+                          }),
+      mc_rtc::gui::Label("Current velcity control mode",
+                         [this]()
+                         {
+                           if(toggleKeyboard) return std::string{"Keyboard"};
+                           if(toggleJoystick && controllerAvailable) return std::string{"mc_joystick_plugin"};
+                           return std::string{"GUI"};
+                         }),
+      mc_rtc::gui::Button("Toggle Keyboard",
+                          [this]()
+                          {
+                            toggleKeyboard = !toggleKeyboard;
+                            if(toggleKeyboard) toggleJoystick = false;
+                          }),
+      mc_rtc::gui::Label("Joystick plugin available", [this]() { return controllerAvailable ? "Yes" : "No"; }),
+      mc_rtc::gui::Label("Command values", []() { return std::string(" "); }),
       mc_rtc::gui::NumberInput(
           "vx", [this]() { return rlRuntime_.command()(0); }, [this](double v) { rlRuntime_.command()(0) = v; }),
       mc_rtc::gui::NumberInput(
